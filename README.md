@@ -1,4 +1,5 @@
 # Core
+It provides various utility functions. Return values ​​are always returned in a Result object (except for internal functions). Functions such as file writing and reading have been implemented to ensure stable operation.
 
 ## Result
 
