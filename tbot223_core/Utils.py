@@ -1,6 +1,6 @@
 # external Modules
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional, Union
 import time
 import hashlib, secrets
 import logging
@@ -326,7 +326,7 @@ class GlobalVars:
         >>> print(globals("api_key").data)  # Output: 12345
     """
     
-    def __init__(self, is_logging_enabled: bool=False, base_dir: Optional[Path]=None,
+    def __init__(self, is_logging_enabled: bool=False, base_dir: Union[str, Path]=None,
                  logger_manager_instance: Optional[LogSys.LoggerManager]=None, logger: Optional[logging.Logger]=None, 
                  log_instance: Optional[LogSys.Log]=None):
         
@@ -335,7 +335,7 @@ class GlobalVars:
         object.__setattr__(self, 'vars', {})
         
         # Initialize Paths
-        self._BASE_DIR = base_dir or Path(__file__).resolve().parent.parent
+        self._BASE_DIR = Path(base_dir or Path(__file__).resolve().parent.parent)
 
         # Initialize Flags
         self.is_logging_enabled = is_logging_enabled

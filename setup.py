@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='tbot223-core',
-    version='2.0.1',
+    version='2.0.2',
     description='A core utility package for tbot223 projects.',
     long_description=long_description,
     long_description_content_type="text/markdown",

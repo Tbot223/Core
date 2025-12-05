@@ -24,17 +24,19 @@ class LoggerManager:
         - get_logger(logger_name) -> Result
             Get logger instance by name
     """
-    def __init__(self, base_dir: Union[str, Path]=None, second_log_dir: str="default"):
+    def __init__(self, base_dir: Path=None, second_log_dir: str="default"):
         """
         Initialize logger manager
         """
+        # Dictionary to hold logger instances
         self._loggers = {}
-        # Create log directory
-        if base_dir is None:
-            base_dir = Path(__file__).resolve().parent.parent / "logs"
-            os.makedirs(base_dir, exist_ok=True)
-        self._BASE_DIR = base_dir
+
+        # Initialize base directory for logs
+        self._BASE_DIR = Path(base_dir or Path(__file__).resolve().parent.parent / "logs")
+        os.makedirs(self._BASE_DIR, exist_ok=True)
         self.second_log_dir = second_log_dir
+
+        # Record start time for log filenames
         self._started_time = time.strftime("%Y-%m-%d_%Hh-%Mm-%Ss", time.localtime())
 
     def make_logger(self, logger_name: str, log_level: int=logging.INFO, time: Any = None) -> Result:

@@ -55,7 +55,7 @@ class AppCore:
                  log_instance: Optional[LogSys.Log]=None, filemanager: Optional[FileManager.FileManager]=None):
 
         # Initialize paths
-        self._PARENT_DIR = base_dir or Path(__file__).resolve().parent.parent
+        self._PARENT_DIR = Path(base_dir or Path(__file__).resolve().parent.parent)
         self._LANG_DIR = self._PARENT_DIR / "Languages"
         Path.mkdir(self._LANG_DIR, exist_ok=True)
 
@@ -442,4 +442,54 @@ class AppCore:
             os.execl(python, python, * sys.argv)
         except Exception as e:
             self.log.log_message("ERROR", f"Error in restart_application: {str(e)}")
+            return self._exception_tracker.get_exception_return(e)
+        
+    def safe_CLI_input(self, prompt: str="", input_type: type=str, valid_options: List[str]=None, case_sensitive: bool=False, allow_empty: bool=False) -> Result:
+        """
+        Safely get user input from the command line with validation.
+
+        Args:
+            prompt : The prompt message to display to the user.
+            valid_options : A list of valid options. If provided, input must match one of these options.
+            case_sensitive : If True, input validation is case sensitive.
+            allow_empty : If True, allows empty input.
+        
+        Returns:
+            The user input if it passes validation.
+
+        Example:
+            >>> result = app_core.safe_CLI_input(prompt="Enter your choice: ", valid_options=["yes", "no"], case_sensitive=False)
+            >>> if result.success:
+            >>>     print(f"You entered: {result.data}")
+            >>> else:
+            >>>     print(result.error)
+        """
+        try:
+            def validate_input(user_input: str) -> bool:
+                if not allow_empty and user_input == "":
+                    return False
+                if valid_options:
+                    comparison_input = user_input if case_sensitive else user_input.lower()
+                    comparison_options = valid_options if case_sensitive else [opt.lower() for opt in valid_options]
+                    return comparison_input in comparison_options
+                return True
+            
+            while True:
+                user_input = input(prompt)
+                if validate_input(user_input):
+                    try:
+                        converted_input = input_type(user_input)
+                        self.log.log_message("INFO", f"User input received and validated: {converted_input}")
+                        return Result(True, None, None, converted_input)
+                    except ValueError:
+                        self.log.log_message("WARNING", f"Input conversion to {input_type} failed for input: {user_input}")
+                        print(f"Invalid input type. Please enter a value of type {input_type.__name__}.")
+                else:
+                    self.log.log_message("WARNING", f"User input validation failed: {user_input}")
+                    if valid_options:
+                        print(f"Invalid option. Please choose from: {', '.join(valid_options)}")
+                    else:
+                        print("Invalid input. Please try again.")
+        except Exception as e:
+            self.log.log_message("ERROR", f"Error in safe_CLI_input: {str(e)}")
             return self._exception_tracker.get_exception_return(e)
