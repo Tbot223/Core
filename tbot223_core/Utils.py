@@ -1,6 +1,6 @@
 # external Modules
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, List, Any
 import time
 import hashlib, secrets
 import logging
@@ -235,6 +235,51 @@ class Utils:
             return Result(True, None, None, is_valid)
         except Exception as e:
             self.log.log_message("ERROR", f"PBKDF2 HMAC hash verification failed: {e}")
+            return self._exception_tracker.get_exception_return(e)
+        
+    def insert_at_intervals(self, data: Union[List, str], interval: int, insert: Any, at_start: bool=True) -> Result:
+        """
+        Insert a specified element into a list or string at regular intervals.
+
+        Args:
+            - data (list or str): The original list or string where elements will be inserted.
+            - interval (int): The interval at which to insert the element. (must be a positive integer)
+            - insert (Any): The element to insert into the list or string. (if data is a string, using object like callable is not recommended as it will be converted to string)
+            - at_start (bool, optional): If True, insertion starts at the beginning (index 0). If False, insertion starts after the first interval. Defaults to True.
+
+        Returns:
+            Result: A Result object containing the modified list or string.
+
+        Example:
+            >>> utils = Utils()
+            >>> data_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+            >>> result = utils.insert_at_intervals(data_list, 3, 'X', at_start=True)
+            >>> if result.success:
+            >>>    print(result.data)  # Output: ['X', 1, 2, 3, 'X', 4, 5, 6, 'X', 7, 8, 9]
+            >>> else:
+            >>>    print(result.error)
+        """
+        try:
+            if not isinstance(data, (list, str)):
+                raise ValueError("data must be a list or string")
+            if not isinstance(interval, int) or interval <= 0:
+                raise ValueError("interval must be a positive integer")
+            if not isinstance(at_start, bool):
+                raise ValueError("at_start must be a boolean value")
+        
+            original_type_is_str = False
+            if isinstance(data, str):
+                original_type_is_str = True
+                data = list(data)
+
+            at_start = 0 if at_start else interval
+            for i in range(at_start, len(data)+at_start, interval+1):
+                data[i:i] = [insert]
+
+            if original_type_is_str:
+                data = ''.join(map(str, data))
+            return Result(True, None, None, data)
+        except Exception as e:
             return self._exception_tracker.get_exception_return(e)
         
 class DecoratorUtils:

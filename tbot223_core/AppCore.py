@@ -156,6 +156,11 @@ class AppCore:
                 except Exception as e:
                     self.log.log_message("ERROR", f"Error executing task at index {idx}: {str(e)}")
                     results[idx] = self._exception_tracker.get_exception_return(e, params=data[idx][1])
+                    
+            try:
+                executor.shutdown(wait=True)
+            except Exception as e:
+                self.log.log_message("ERROR", f"Error during executor shutdown: {str(e)}")
         return results
     
     def _chunk_list(self, data_list: List, chunk_size: int) -> Generator[List, None, None]:
@@ -470,7 +475,7 @@ class AppCore:
                     return False
                 if valid_options:
                     comparison_input = user_input if case_sensitive else user_input.lower()
-                    comparison_options = valid_options if case_sensitive else [opt.lower() for opt in valid_options]
+                    comparison_options = valid_options if case_sensitive else map(str.lower, valid_options)
                     return comparison_input in comparison_options
                 return True
             
