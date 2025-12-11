@@ -1,1 +1,1 @@
-__version__ = "2.0.4-hotfix1"
+__version__ = "2.0.5"
