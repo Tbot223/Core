@@ -4,6 +4,7 @@ from typing import Optional, Union, List, Any, Dict, Callable
 import time
 import hashlib, secrets
 import logging
+import threading
 
 # internal Modules
 from tbot223_core.Result import Result
@@ -472,6 +473,7 @@ class GlobalVars:
         # Set initialization flag to bypass __setattr__ during __init__
         object.__setattr__(self, '_initializing', True)
         object.__setattr__(self, 'vars', {})
+        object.__setattr__(self, '_lock', threading.RLock())
         
         # Initialize Paths
         self._BASE_DIR = Path(base_dir or Path(__file__).resolve().parent.parent)
@@ -513,14 +515,15 @@ class GlobalVars:
             >>>     print(result.error)
         """
         try:
-            if self.exists(key).data and not overwrite:
-                raise KeyError(f"Global variable '{key}' already exists.")
-            if key is None or not isinstance(key, str) or key.strip() == "":
-                raise ValueError("key must be a non-empty string.")
-            
-            self.vars[key] = value
-            self.log.log_message("INFO", f"Global variable '{key}' set.")
-            return Result(True, None, None, f"Global variable '{key}' set.")
+            with self._lock:
+                if self.exists(key).data and not overwrite:
+                    raise KeyError(f"Global variable '{key}' already exists.")
+                if key is None or not isinstance(key, str) or key.strip() == "":
+                    raise ValueError("key must be a non-empty string.")
+                
+                self.vars[key] = value
+                self.log.log_message("INFO", f"Global variable '{key}' set.")
+                return Result(True, None, None, f"Global variable '{key}' set.")
         except Exception as e:
             self.log.log_message("ERROR", f"Failed to set global variable '{key}': {e}")
             return self._exception_tracker.get_exception_return(e)
@@ -545,11 +548,12 @@ class GlobalVars:
             >>>     print(result.error)
         """
         try:
-            if not self.exists(key):
-                raise KeyError(f"Global variable '{key}' does not exist.")
-            
-            self.log.log_message("INFO", f"Global variable '{key}' accessed.")
-            return Result(True, None, None, self.vars[key])
+            with self._lock:
+                if not self.exists(key):
+                    raise KeyError(f"Global variable '{key}' does not exist.")
+                
+                self.log.log_message("INFO", f"Global variable '{key}' accessed.")
+                return Result(True, None, None, self.vars[key])
         except Exception as e:
             self.log.log_message("ERROR", f"Failed to get global variable '{key}': {e}")
             return self._exception_tracker.get_exception_return(e)
@@ -574,12 +578,13 @@ class GlobalVars:
             >>>     print("Failed to delete api_key.")
         """
         try:
-            if not self.exists(key):
-                raise KeyError(f"Global variable '{key}' does not exist.")
-            
-            del self.vars[key]
-            self.log.log_message("INFO", f"Global variable '{key}' deleted.")
-            return Result(True, None, None, f"Global variable '{key}' deleted.")
+            with self._lock:
+                if not self.exists(key):
+                    raise KeyError(f"Global variable '{key}' does not exist.")
+                
+                del self.vars[key]
+                self.log.log_message("INFO", f"Global variable '{key}' deleted.")
+                return Result(True, None, None, f"Global variable '{key}' deleted.")
         except Exception as e:
             self.log.log_message("ERROR", f"Failed to delete global variable '{key}': {e}")
             return self._exception_tracker.get_exception_return(e)
@@ -602,11 +607,12 @@ class GlobalVars:
             >>>     print(result.error)
         """
         try:
-            for name in list(self.vars.keys()):
-                del self.vars[name]
+            with self._lock:
+                for name in list(self.vars.keys()):
+                    del self.vars[name]
 
-            self.log.log_message("INFO", "All global variables cleared.")
-            return Result(True, None, None, "All global variables cleared.")
+                self.log.log_message("INFO", "All global variables cleared.")
+                return Result(True, None, None, "All global variables cleared.")
         except Exception as e:
             self.log.log_message("ERROR", f"Failed to clear global variables: {e}")
             return self._exception_tracker.get_exception_return(e)
@@ -629,9 +635,9 @@ class GlobalVars:
             >>>     print(result.error)
         """
         try:
-
-            self.log.log_message("INFO", "Listing all global variables.")
-            return Result(True, None, None, list(self.vars.keys()))
+            with self._lock:
+                self.log.log_message("INFO", "Listing all global variables.")
+                return Result(True, None, None, list(self.vars.keys()))
         except Exception as e:
             self.log.log_message("ERROR", f"Failed to list global variables: {e}")
             return self._exception_tracker.get_exception_return(e)
@@ -656,9 +662,10 @@ class GlobalVars:
             >>>     print(result.error)
         """
         try:
-            exists = key in self.vars
-            self.log.log_message("INFO", f"Checked existence of global variable '{key}': {exists}")
-            return Result(True, None, None, exists)
+            with self._lock:
+                exists = key in self.vars
+                self.log.log_message("INFO", f"Checked existence of global variable '{key}': {exists}")
+                return Result(True, None, None, exists)
         except Exception as e:
             self.log.log_message("ERROR", f"Failed to check existence of global variable '{key}': {e}")
             return self._exception_tracker.get_exception_return(e)
@@ -679,9 +686,10 @@ class GlobalVars:
             >>> print(globals.api_key)  # Output: 12345 ( this part uses __getattr__ )
         """
         try:
-            if not self.exists(name).data:
-                raise KeyError(f"Global variable '{name}' does not exist.")
-            return self.vars[name]
+            with object.__getattribute__(self, '_lock'):
+                if not self.exists(name).data:
+                    raise KeyError(f"Global variable '{name}' does not exist.")
+                return self.vars[name]
         except Exception as e:
             return self._exception_tracker.get_exception_return(e)
         
@@ -713,11 +721,12 @@ class GlobalVars:
         
         # After initialization, store in vars dict
         try:
-            if name is None or not isinstance(name, str) or name.strip() == "":
-                raise ValueError("name must be a non-empty string.")
-            
-            vars_dict = object.__getattribute__(self, 'vars')
-            vars_dict[name] = value
+            with object.__getattribute__(self, '_lock'):
+                if name is None or not isinstance(name, str) or name.strip() == "":
+                    raise ValueError("name must be a non-empty string.")
+                
+                vars_dict = object.__getattribute__(self, 'vars')
+                vars_dict[name] = value
         except Exception as e:
             exception_tracker = object.__getattribute__(self, '_exception_tracker')
             return exception_tracker.get_exception_return(e)

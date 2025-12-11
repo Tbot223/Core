@@ -284,6 +284,39 @@ class TestEdgeCases:
         get_result = global_vars.get(key)
         assert not get_result.success, "Getting a variable with None as key should fail"
 
+    def test_global_var_extreme_change(self, setup_module):
+        _, _, global_vars = setup_module
+
+        # Extreme change test: setting a very large number of global variables
+        num_vars = 50000
+        for i in range(num_vars):
+            key = f"var_{i}"
+            value = i
+            set_result = global_vars.set(key, value)
+            assert set_result.success, f"Failed to set global variable {key}: {set_result.error}"
+
+        # Verify a few random variables
+        for i in random.sample(range(num_vars), 10):
+            key = f"var_{i}"
+            get_result = global_vars.get(key)
+            assert get_result.success, f"Failed to get global variable {key}: {get_result.error}"
+            assert get_result.data == i, f"Value mismatch for {key}: expected {i}, got {get_result.data}"
+
+        # del and re-write some variables
+        for i in random.sample(range(num_vars), 5000):
+            key = f"var_{i}"
+            delete_result = global_vars.delete(key)
+            assert delete_result.success, f"Failed to delete global variable {key}: {delete_result.error}"
+            set_result = global_vars.set(key, i * 2)
+            assert set_result.success, f"Failed to reset global variable {key}: {set_result.error}"
+            get_result = global_vars.get(key)
+            assert get_result.success, f"Failed to get reset global variable {key}: {get_result.error}"
+            assert get_result.data == i * 2, f"Value mismatch for reset {key}: expected {i * 2}, got {get_result.data}"
+
+        # Clean up
+        clear_result = global_vars.clear()
+        assert clear_result.success, f"Failed to clear global variables after extreme change test: {clear_result.error}"
+        
     # I WILL ADD MORE EDGE CASE TESTS HERE IN THE FUTURE
 
 if __name__ == "__main__":
