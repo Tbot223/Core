@@ -85,20 +85,6 @@ class TestAppCore:
         results = test_appcore_initialization.process_pool_executor(tasks, workers=4, override=False, timeout=1, chunk_size=10)
         helper_methods.verify_results(results.data, expected_count=50)
 
-    def test_find_keys_by_value(self, test_appcore_initialization: AppCore.AppCore) -> None:
-        """
-        Test the find_keys_by_value method for both nested and non-nested dictionaries.
-        """
-        # Non-nested dictionary test
-        sample_dict = {'a': 1, 'b': 2, 'c': 1, 'd': 3}
-        keys = test_appcore_initialization.find_keys_by_value(sample_dict, 1, "eq", False).data
-        assert set(keys) == {'a', 'c'}
-
-        # Nested dictionary test
-        sample_dict_nested = {'a': 1, 'b': {'b1': 2, 'b2': 1}, 'c': 1, 'd': 3}
-        keys_nested = test_appcore_initialization.find_keys_by_value(sample_dict_nested, 1, "eq", True).data
-        assert set(keys_nested) == {'a', 'b.b2', 'c'}
-
     def test_get_text_by_lang(self, test_appcore_initialization: AppCore.AppCore) -> None:
         """
         Test the get_text_by_lang method for retrieving text based on language code.
@@ -178,23 +164,6 @@ class TestAppCoreXfail:
         assert wrong_chunk_size_result.success is False
         assert "chunk_size must be a positive integer" in wrong_chunk_size_result.error
 
-    def test_find_keys_by_value(self, test_appcore_initialization: AppCore.AppCore) -> None:
-        """
-        Test failure scenarios for the find_keys_by_value method.
-        """
-        # Non-dictionary input test
-        non_dict_result = test_appcore_initialization.find_keys_by_value("not_a_dict", 1, "eq", False)
-        assert non_dict_result.success is False
-        assert "Input data must be a dictionary" in non_dict_result.error
-
-        wrong_comparison_result = test_appcore_initialization.find_keys_by_value({'a': 1}, 1, "unsupported_op", False)
-        assert wrong_comparison_result.success is False
-        assert "Unsupported comparison operator: unsupported_op" in wrong_comparison_result.error
-
-        wrong_threshold_result = test_appcore_initialization.find_keys_by_value({'a': 1}, ['not', 'a', 'valid', 'type'], "eq", False)
-        assert wrong_threshold_result.success is False
-        assert "Threshold must be of type str, bool, int, or float" in wrong_threshold_result.error
-
 @pytest.mark.usefixtures("tmp_path", "test_appcore_initialization", "helper_methods")
 class TestAppCoreEdgeCases:
     def test_process_pool_executor_no_chunk(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods) -> None:
@@ -258,22 +227,11 @@ class TestAppCorePerformance:
         helper_methods.verify_results(results.data, expected_count=2000)
 
     @pytest.mark.performance
-    def test_find_keys_by_value_performance(self, test_appcore_initialization: AppCore.AppCore) -> None:
-        """
-        Performance test for the find_keys_by_value method with a large nested dictionary.
-        """
-        large_dict = {f'key_{i}': random.randint(1, 100) for i in range(10000)}
-        nested_large_dict = {f'key_{i}': {'subkey_{j}': random.randint(1, 100) for j in range(10)} for i in range(1000)}
-        large_dict.update(nested_large_dict)
-        result = test_appcore_initialization.find_keys_by_value(large_dict, 50, "eq", True)
-        assert result.success is True
-
-    @pytest.mark.performance
     def test_get_text_by_lang_performance(self, test_appcore_initialization: AppCore.AppCore) -> None:
         """
         Performance test for the get_text_by_lang method with multiple language requests.
         """
-        for _ in range(1000):
+        for _ in range(2000):
             result = test_appcore_initialization.get_text_by_lang("Test Key", random.choice(["en", "ko", "de", "fr", "es"]))
             assert result.success is True
     

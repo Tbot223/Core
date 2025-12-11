@@ -24,17 +24,17 @@ class LoggerManager:
         - get_logger(logger_name) -> Result
             Get logger instance by name
     """
-    def __init__(self, base_dir: Path=None, second_log_dir: str="default"):
+    def __init__(self, base_dir: Union[str, Path]=None, second_log_dir: Union[str, Path]="default"):
         """
         Initialize logger manager
         """
         # Dictionary to hold logger instances
         self._loggers = {}
-
+        
         # Initialize base directory for logs
         self._BASE_DIR = Path(base_dir or Path(__file__).resolve().parent.parent / "logs")
         os.makedirs(self._BASE_DIR, exist_ok=True)
-        self.second_log_dir = second_log_dir
+        self.second_log_dir = str(second_log_dir)
 
         # Record start time for log filenames
         self._started_time = time.strftime("%Y-%m-%d_%Hh-%Mm-%Ss", time.localtime())
@@ -183,4 +183,45 @@ class Log:
             self.logger.log(level, message)
             return Result(True, None, None, "Log message sent successfully.")
         except Exception as e:
-            return ExceptionTracker().get_exception_return(e) 
+            return ExceptionTracker().get_exception_return(e)
+        
+class SimpleSetting:
+    """
+    Simple setting class for LoggerManager and Log
+    
+    Attributes:
+        - logger_manager : Instance of LoggerManager.
+        - log : Instance of Log.
+        - logger : Logger instance.
+        
+    Methods:
+        - get_instance() -> Tuple[LoggerManager, Log, logging.Logger]
+            Get instances of LoggerManager, Log, and Logger.
+    """
+    def __init__(self, base_dir: Union[str, Path], second_log_dir: Union[str, Path], logger_name: str):
+        """
+        Simple setting for LoggerManager and Log
+        """
+        self.logger_manager = LoggerManager(base_dir, second_log_dir)
+        result = self.logger_manager.make_logger(logger_name)
+        if result.success:
+            self.logger = result.data
+        else:
+            self.logger = None
+        self.log = Log(self.logger)
+
+    def get_instance(self):
+        """
+        Get instances of LoggerManager, Log, and Logger.
+        
+        Args:
+            None
+            
+        Returns:
+            Tuple[LoggerManager, Log, logging.Logger]: Instances of LoggerManager, Log, and Logger.
+            
+        Example:
+            >>> setting = SimpleSetting("logs", "default", "app_logger")
+            >>> logger_manager, log, logger = setting.get_instance()
+        """
+        return self.logger_manager, self.log, self.logger

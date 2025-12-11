@@ -182,40 +182,6 @@ class AppCore:
         """
         for i in range(0, len(data_list), chunk_size):
             yield data_list[i:i + chunk_size]
-    
-    def _lookup_dict(self, dict_obj: Dict, threshold: Union[int, float, str, bool], comparison_func: Callable, comparison_type: str, nested: bool, nest_mark: str = "") -> List:
-        """
-        Helper method to recursively look up keys in a dictionary based on a comparison function.
-
-        Args:
-            dict_obj : The dictionary to search.
-            threshold : The value to compare against.
-            comparison_func : A callable that takes a value and returns True if it meets the condition.
-            comparison_type : The type of comparison being performed.
-            nested : If True, search within nested dictionaries.
-
-        Returns:
-            A list of keys that meet the comparison criteria.
-
-        Example:
-            >>> # I'm not recommending to call this method directly, it's for internal use.
-            >>> my_dict = {'a': 10, 'b': 20, 'c': 30}
-            >>> found_keys = app_core._lookup_dict(my_dict, threshold=20, comparison_func=lambda x: x > 20, comparison_type='gt', nested=False)
-            >>> print(found_keys)  # Output: ['c']
-        """
-        found_keys = []
-        for key, value in dict_obj.items():
-            if isinstance(value, (str, bool)) != isinstance(threshold, (str, bool)) and comparison_type in ['eq', 'ne']:
-                continue
-            if isinstance(value, (tuple, list)):
-                continue
-            if comparison_func(value):
-                found_keys.append(f"{nest_mark}{key}")
-                self.log.log_message("DEBUG", f"Key '{nest_mark}{key}' matches the condition.")
-            if nested and isinstance(value, dict):
-                self.log.log_message("DEBUG", f"Searching nested dictionary at key '{key}'.")
-                found_keys.extend(self._lookup_dict(value, threshold, comparison_func, comparison_type, nested, f"{nest_mark}{key}."))
-        return found_keys
 
     # external Methods
     def thread_pool_executor(self, data: List[Tuple[Callable[ ... , Any], Dict]], workers: int = None, override: bool = False, timeout: float = None) -> Result:
@@ -286,60 +252,6 @@ class AppCore:
             return Result(True, None, None, results)
         except Exception as e:
             self.log.log_message("ERROR", f"Error in process pool executor: {str(e)}")
-            return self._exception_tracker.get_exception_return(e)
-
-    def find_keys_by_value(self, dict_obj: Dict, threshold: Union[int, float, str, bool],  comparison: str='eq', nested: bool=False) -> Result:
-        """
-        Find keys in dict_obj where their values meet the threshold based on the comparison operator.
-
-        [bool, str] - [int, float] comparisons are only supported for 'eq' and 'ne'.
-
-        Args:
-            dict_obj : The dictionary to search.
-            threshold : The value to compare against.
-            comparison : The comparison operator as a string. Default is 'eq' (equal).
-            nested : If True, search within nested dictionaries.
-
-        Returns:
-            A list of keys that meet the comparison criteria.
-
-        Example:
-            >>> my_dict = {'a': 10, 'b': 20, 'c': 30}
-            >>> result = app_core.find_keys_by_value(my_dict, threshold=20, comparison='gt', nested=False)
-            >>> print(result.data)  # Output: ['c']
-
-        Supported comparison operators:
-        - 'eq': equal to
-        - 'ne': not equal to
-        - 'lt': less than
-        - 'le': less than or equal to
-        - 'gt': greater than
-        - 'ge': greater than or equal to
-        """
-        comparison_operators = {
-            'eq': lambda x: x == threshold,
-            'ne': lambda x: x != threshold,
-            'lt': lambda x: x < threshold,
-            'le': lambda x: x <= threshold,
-            'gt': lambda x: x > threshold,
-            'ge': lambda x: x >= threshold,
-        }
-
-        try:
-            if comparison not in comparison_operators:
-                raise ValueError(f"Unsupported comparison operator: {comparison}")
-            if isinstance(dict_obj, dict) is False:
-                raise ValueError("Input data must be a dictionary")
-            if isinstance(threshold, (str, bool, int, float)) is False:
-                raise ValueError("Threshold must be of type str, bool, int, or float")
-            
-            comparison_func = comparison_operators[comparison]
-            found_keys = self._lookup_dict(dict_obj, threshold, comparison_func, comparison, nested)
-
-            self.log.log_message("INFO", f"find_keys_by_value found {len(found_keys)} keys matching criteria.")
-            return Result(True, None, None, found_keys)
-        except Exception as e:
-            self.log.log_message("ERROR", f"Error in find_keys_by_value: {str(e)}")
             return self._exception_tracker.get_exception_return(e)
         
     def get_text_by_lang(self, key: str, lang: str) -> Result:

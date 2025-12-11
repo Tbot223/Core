@@ -71,5 +71,7 @@ class TestLogSysEdgeCases:
         result = logger_manager.make_logger(logger_name=logger_name, log_level=invalid_log_level)
         assert not result.success, "Logger creation with invalid log level should have failed."
 
+    # I WILL ADD MORE EDGE CASE TESTS HERE IN THE FUTURE
+
 if __name__ == "__main__":
     pytest.main([__file__])

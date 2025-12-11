@@ -1,7 +1,7 @@
 # external Modules
 import pytest
 from pathlib import Path
-import time
+import time, random
 
 # internal Modules
 from tbot223_core import Utils
@@ -49,6 +49,51 @@ class TestUtils:
                                             hash_hex=result.data['hash_hex'], algorithm=algorithm, iterations=iterations)
         assert verified.success, f"PBKDF2-HMAC verification failed: {verified.error}"
         assert verified.data is True, "PBKDF2-HMAC verification returned False"
+
+    def test_find_keys_by_value(self, setup_module) -> None:
+        utils, _, _ = setup_module
+        """
+        Test the find_keys_by_value method for both nested and non-nested dictionaries.
+        """
+        # Non-nested dictionary test
+        sample_dict = {'a': 1, 'b': 2, 'c': 1, 'd': 3}
+        keys = utils.find_keys_by_value(sample_dict, 1, "eq", False).data
+        assert set(keys) == {'a', 'c'}
+
+        # Nested dictionary test
+        sample_dict_nested = {'a': 1, 'b': {'b1': 2, 'b2': 1}, 'c': 1, 'd': 3}
+        keys_nested = utils.find_keys_by_value(sample_dict_nested, 1, "eq", True).data
+        assert set(keys_nested) == {'a', 'b.b2', 'c'}
+
+    def test_find_keys_by_value_failure(self, setup_module) -> None:
+        utils, _, _ = setup_module
+        """
+        Test failure scenarios for the find_keys_by_value method.
+        """
+        # Non-dictionary input test
+        non_dict_result = utils.find_keys_by_value("not_a_dict", 1, "eq", False)
+        assert non_dict_result.success is False
+        assert "Input data must be a dictionary" in non_dict_result.error
+
+        wrong_comparison_result = utils.find_keys_by_value({'a': 1}, 1, "unsupported_op", False)
+        assert wrong_comparison_result.success is False
+        assert "Unsupported comparison operator: unsupported_op" in wrong_comparison_result.error
+
+        wrong_threshold_result = utils.find_keys_by_value({'a': 1}, ['not', 'a', 'valid', 'type'], "eq", False)
+        assert wrong_threshold_result.success is False
+        assert "Threshold must be of type str, bool, int, or float" in wrong_threshold_result.error
+
+    @pytest.mark.performance
+    def test_find_keys_by_value_performance(self, setup_module) -> None:
+        utils, _, _ = setup_module
+        """
+        Performance test for the find_keys_by_value method with a large nested dictionary.
+        """
+        large_dict = {f'key_{i}': random.randint(1, 100) for i in range(10000)}
+        nested_large_dict = {f'key_{i}': {'subkey_{j}': random.randint(1, 100) for j in range(10)} for i in range(1000)}
+        large_dict.update(nested_large_dict)
+        result = utils.find_keys_by_value(large_dict, 50, "eq", True)
+        assert result.success is True
 
 @pytest.mark.usefixtures("setup_module")
 class TestDecoratorUtils:
@@ -239,5 +284,7 @@ class TestEdgeCases:
         get_result = global_vars.get(key)
         assert not get_result.success, "Getting a variable with None as key should fail"
 
+    # I WILL ADD MORE EDGE CASE TESTS HERE IN THE FUTURE
+
 if __name__ == "__main__":
-    pytest.main([__file__, "-vv"])
+    pytest.main([__file__, "-v", '-m "not performance"'])
