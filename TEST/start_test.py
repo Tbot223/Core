@@ -22,13 +22,17 @@ class Test_CoreV2:
     def test_FileManager(self):
         pytest.main([FileManager_test.__file__])
 
-    def run_all_tests(self):
-        pytest.main([str(Path(__file__).parent / "SRC"), "-m not performance"])
+    def run_all_tests(self, include_performance=False, duration=False):
+        pytest.main([str(Path(__file__).resolve().parent / "SRC"), "-v", "" if include_performance else "-m not performance", "--durations=10" if duration else ""])
 
 if __name__ == "__main__":
+    performance_test = input("Do you want to run performance tests? (y/n): ").strip().lower()
+    show_run_duration = input("Do you want to see the test run duration? (y/n): ").strip().lower()
+    duration = show_run_duration == 'y'
+    include_performance = performance_test == 'y'
     log_del = input("Do you want to delete the log files after running the test? (**Caution** All existing logs will be deleted) (y/n): ").strip().lower()
     tester = Test_CoreV2()
-    tester.run_all_tests()
+    tester.run_all_tests(include_performance=include_performance, duration=duration)
     if log_del == 'y':
         log_dir = Path(__file__).resolve().parent / "SRC" / "logs"
         with FileManager.FileManager(is_logging_enabled=False) as FM:

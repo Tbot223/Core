@@ -223,7 +223,7 @@ class TestAppCorePerformance:
         Performance test for the process pool executor with 2000 tasks.
         """
         tasks = [(helper_methods.metrix_task, {"n": i+1, "m": i+1}) for i in range(2000)]
-        results = test_appcore_initialization.process_pool_executor(tasks, workers=8, override=False, timeout=5, chunk_size=20)
+        results = test_appcore_initialization.process_pool_executor(tasks, workers=8, override=False, timeout=5, chunk_size=64)
         helper_methods.verify_results(results.data, expected_count=2000)
 
     @pytest.mark.performance
