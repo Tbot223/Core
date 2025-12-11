@@ -15,17 +15,23 @@ class Utils:
     Utility class providing various helper functions.
 
     Methods:
-        - str_to_path(path_str: str) -> Result
+        - str_to_path(path_str) -> Result
             Convert a string to a Path object.
         
-        - encrypt(data: str, algorithm: str='sha256') -> Result
+        - encrypt(data, algorithm) -> Result
             Encrypt a string using the specified algorithm.
 
-        - pbkdf2_hmac(password: str, algorithm: str, iterations: int, salt_size: int) -> Result
+        - pbkdf2_hmac(password, algorithm, iterations, salt_size) -> Result
             Generate a PBKDF2 HMAC hash of the given password.
 
-        - verify_pbkdf2_hmac(password: str, salt_hex: str, hash_hex: str, iterations: int, algorithm: str) -> Result
+        - verify_pbkdf2_hmac(password, salt_hex, hash_hex, iterations, algorithm) -> Result
             Verify a PBKDF2 HMAC hash of the given password.
+
+        - insert_at_intervals(data, interval, insert, at_start) -> Result
+            Insert a specified element into a list or string at regular intervals.
+
+        - find_keys_by_value(dict_obj, threshold, comparison, nested) -> Result
+            Find keys in a dictionary based on value comparisons.
     """
     
     def __init__(self, is_logging_enabled: bool=False,

@@ -32,9 +32,6 @@ class AppCore:
 
         process_pool_executor(data, workers, override, timeout) -> Result:
             Execute functions in parallel using ProcessPoolExecutor.
-
-        find_keys_by_value(dict_obj, threshold, comparison, nested) -> Result:
-            Find keys in a dictionary based on value comparisons.
         
         get_text_by_lang(key, lang) -> Result:
             Retrieve localized text for the given key and language.
