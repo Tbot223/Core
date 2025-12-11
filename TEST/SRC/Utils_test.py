@@ -1,7 +1,7 @@
 # external Modules
 import pytest
 from pathlib import Path
-import time, random
+import time, random, os
 
 # internal Modules
 from tbot223_core import Utils
@@ -20,7 +20,7 @@ def setup_module():
 class TestUtils:
     def test_str_to_path(self, setup_module):
         utils, _, _ = setup_module
-        path_str = "some/directory/path"
+        path_str = "some/directory/path" if os.name != 'nt' else "some\\directory\\path"
         path_obj = utils.str_to_path(path_str)
         assert path_obj.success, f"Failed to convert string to path: {path_obj.error}"
         assert isinstance(path_obj.data, type(Path())), "Converted data is not a Path object"
@@ -287,4 +287,4 @@ class TestEdgeCases:
     # I WILL ADD MORE EDGE CASE TESTS HERE IN THE FUTURE
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", '-m "not performance"'])
+    pytest.main([__file__, "-m not performance"])

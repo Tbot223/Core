@@ -8,7 +8,7 @@ from tbot223_core import FileManager
 
 class Test_CoreV2:
     def test_AppCore(self):
-        pytest.main([AppCore_test.__file__, "-m", "not performance"])
+        pytest.main([AppCore_test.__file__, "-m not performance"])
 
     def test_Exception(self):
         pytest.main([Exception_test.__file__])
@@ -23,7 +23,7 @@ class Test_CoreV2:
         pytest.main([FileManager_test.__file__])
 
     def run_all_tests(self):
-        pytest.main([str(Path(__file__).parent / "SRC"), "-m", "not performance"])
+        pytest.main([str(Path(__file__).parent / "SRC"), "-m not performance"])
 
 if __name__ == "__main__":
     log_del = input("Do you want to delete the log files after running the test? (**Caution** All existing logs will be deleted) (y/n): ").strip().lower()

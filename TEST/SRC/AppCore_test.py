@@ -203,8 +203,8 @@ class TestCLIMethods:
         """
         Test the restart_application method to ensure it executes without errors.
         """
-        proc = subprocess.run(["python", "-c", "import sys; from CoreV2.AppCore import AppCore; app = AppCore.AppCore(); app.restart_application()"], capture_output=True)
-        assert proc.returncode == 1
+        proc = subprocess.run(["python", "-c", "import sys; from tbot223_core import AppCore; app = AppCore.AppCore(); app.restart_application()"], capture_output=True)
+        assert proc.returncode == 0
 
 @pytest.mark.usefixtures("tmp_path", "test_appcore_initialization", "helper_methods")
 class TestAppCorePerformance:
@@ -237,4 +237,4 @@ class TestAppCorePerformance:
     
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", '-m "not performance"'])
+    pytest.main([__file__, "-v", "-m not performance"])

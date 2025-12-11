@@ -183,6 +183,9 @@ class FileManager:
             encoding = None if is_bytes else 'utf-8'
 
             def replace_temp_with_target(temp_path: Path, target_path: Path):
+                if os.name == 'nt':
+                    os.replace(temp_path, target_path)
+                    return
                 with open(target_path, "a+b") as f:
                     self._lock(f, 1)
                     try:
@@ -198,6 +201,7 @@ class FileManager:
                     os.fsync(temp.fileno())
                 except (AttributeError, OSError):
                     pass  # os.fsync not available on some platforms
+                temp.close()
                 replace_temp_with_target(temp_path, file_path)
 
             self.log.log_message("INFO", f"Successfully wrote to {file_path}")
