@@ -98,6 +98,23 @@ class TestAppCore:
 
         supported_lang = test_appcore_initialization.get_text_by_lang("Test Key", "en")
         assert supported_lang.data == "Test Value" # Supported 'en' text
+    
+    def test_ResultWrapper(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods):
+        
+        @AppCore.ResultWrapper
+        def successful_task(x) -> str:
+            return f"successful, {x}"
+        
+        @AppCore.ResultWrapper
+        def failing_task(x) -> str:
+            raise ValueError("Intentional Failure")
+        
+        success_result = successful_task(10)
+        assert success_result.success is True
+        assert success_result.data == "successful, 10"
+
+        fail_result = failing_task(20)
+        assert fail_result.success is False
 
 @pytest.mark.usefixtures("tmp_path", "test_appcore_initialization", "helper_methods")
 class TestAppCoreXfail:

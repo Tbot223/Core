@@ -287,7 +287,7 @@ class AppCore:
 
             if key not in self._lang_cache[lang]:
                 self.log.log_message("ERROR", f"Key '{key}' not found in language '{lang}'.")
-                return Result(False, f"Key '{key}' not found in language '{lang}'", None, None)
+                raise KeyError(f"Key '{key}' not found in language '{lang}'.")
             
             self.log.log_message("INFO", f"Retrieved text for key '{key}' in language '{lang}'.")
             return Result(True, None, None, self._lang_cache[lang][key])
@@ -407,3 +407,36 @@ class AppCore:
         except Exception as e:
             self.log.log_message("ERROR", f"Error in safe_CLI_input: {str(e)}")
             return self._exception_tracker.get_exception_return(e)
+        
+class ResultWrapper:
+    """
+    A decorator class that ensures the return value of an existing function is wrapped in a Result object.
+
+    - DO NOT use ExceptionTrackerDecorator with ResultWrapper, as ResultWrapper already handles exceptions.
+    - if the decorated function already returns a Result object, it will be returned as is.
+    - If an exception occurs during the function execution, it will be caught and a Result object indicating failure will be returned.
+    - Use for Non-critical functions where you want to ensure a Result object is always returned.
+
+    Example:
+        >>> @ResultWrapper()
+        >>> def my_function(x, y):
+        >>>     return x + y
+        >>> result = my_function(5, 10)
+        >>> print(result.success)  # Output: True
+        >>> print(result.data)     # Output: 15
+    """
+    def __init__(self):
+        pass
+
+    def __call__(self, func: Callable[..., Any]) -> Result:
+        def wrapper(*args, **kwargs) -> Result:
+            try:
+                result = func(*args, **kwargs)
+                if isinstance(result, Result):
+                    return result
+                
+                return Result(True, None, None, result)
+            except Exception as e:
+                tracker = ExceptionTracker()
+                return tracker.get_exception_return(e)
+        return wrapper
