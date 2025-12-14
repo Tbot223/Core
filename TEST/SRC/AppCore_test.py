@@ -99,13 +99,18 @@ class TestAppCore:
         supported_lang = test_appcore_initialization.get_text_by_lang("Test Key", "en")
         assert supported_lang.data == "Test Value" # Supported 'en' text
     
-    def test_ResultWrapper(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods):
+    def test_ResultWrapper(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods) -> None:
+        """
+        Test the ResultWrapper decorator for both successful and failing tasks.
         
-        @AppCore.ResultWrapper
+        AppCore.ResultWrapper is used to wrap functions to automatically handle exceptions
+        and return a standardized result object.
+        """
+        @AppCore.ResultWrapper()
         def successful_task(x) -> str:
             return f"successful, {x}"
         
-        @AppCore.ResultWrapper
+        @AppCore.ResultWrapper()
         def failing_task(x) -> str:
             raise ValueError("Intentional Failure")
         
