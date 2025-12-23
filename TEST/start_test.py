@@ -26,11 +26,18 @@ class Test_CoreV2:
         pytest.main([str(Path(__file__).resolve().parent / "SRC"), "-v", "" if include_performance else "-m not performance", "--durations=10" if duration else ""])
 
 if __name__ == "__main__":
-    performance_test = input("Do you want to run performance tests? (y/n): ").strip().lower()
-    show_run_duration = input("Do you want to see the test run duration? (y/n): ").strip().lower()
+    def verify_input(prompt, valid_responses):
+        while True:
+            response = input(prompt).strip().lower()
+            if response in valid_responses:
+                return response
+            print(f"Invalid input. Please enter one of the following: {', '.join(valid_responses)}")
+
+    performance_test = verify_input("Do you want to run performance tests? (y/n): ", ['y', 'n'])
+    show_run_duration = verify_input("Do you want to see the test run duration? (y/n): ", ['y', 'n'])
+    log_del = verify_input("Do you want to delete the log files after running the test? (**Caution** All existing logs will be deleted) (y/n): ", ['y', 'n'])
     duration = show_run_duration == 'y'
     include_performance = performance_test == 'y'
-    log_del = input("Do you want to delete the log files after running the test? (**Caution** All existing logs will be deleted) (y/n): ").strip().lower()
     tester = Test_CoreV2()
     tester.run_all_tests(include_performance=include_performance, duration=duration)
     if log_del == 'y':

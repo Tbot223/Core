@@ -1,7 +1,7 @@
 # external Modules
 import pytest
 from pathlib import Path
-import time, random, os
+import time, random, os, threading
 
 # internal Modules
 from tbot223_core import Utils
@@ -284,6 +284,7 @@ class TestEdgeCases:
         get_result = global_vars.get(key)
         assert not get_result.success, "Getting a variable with None as key should fail"
 
+    @pytest.mark.performance
     def test_global_var_extreme_change(self, setup_module):
         _, _, global_vars = setup_module
 
@@ -317,6 +318,32 @@ class TestEdgeCases:
         clear_result = global_vars.clear()
         assert clear_result.success, f"Failed to clear global variables after extreme change test: {clear_result.error}"
         
+    def test_global_vars_concurrency(self, setup_module):
+        _, _, global_vars = setup_module
+
+        key = "concurrent_var"
+        global_vars.set(key, 0)
+
+        iterations = 1000
+
+        def increment_var():
+            with global_vars._lock:
+                current_value = global_vars.get(key).data
+                global_vars.set(key, current_value + 1, overwrite=True)
+
+        threads = []
+        for _ in range(iterations):
+            thread = threading.Thread(target=increment_var)
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        result = global_vars.get(key)
+        assert result.success, f"Failed to get concurrent variable: {result.error}"
+        assert result.data == iterations, f"Concurrent increment failed: expected {iterations}, got {result.data}"
+
     # I WILL ADD MORE EDGE CASE TESTS HERE IN THE FUTURE
 
 if __name__ == "__main__":

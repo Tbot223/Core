@@ -62,7 +62,7 @@ class FileManager:
                  log_instance: Optional[LogSys.Log]=None, Utils_instance: Optional[Utils.Utils]=None):
         
         # Initialize paths
-        self._BASE_DIR = Path(base_dir or Path.cwd() if Path.cwd().is_file() else Path.cwd().parent)
+        self._BASE_DIR = Path(base_dir) if base_dir is not None else Path.cwd()
 
         # Initialize Flags
         self.is_logging_enabled = is_logging_enabled

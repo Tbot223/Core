@@ -32,7 +32,7 @@ class LoggerManager:
         self._loggers = {}
         
         # Initialize base directory for logs
-        self._BASE_DIR = Path(base_dir or Path.cwd() if Path.cwd().is_file() else Path.cwd().parent / "logs")
+        self._BASE_DIR = Path(base_dir) if base_dir is not None else Path.cwd() / "logs"
         os.makedirs(self._BASE_DIR, exist_ok=True)
         self.second_log_dir = str(second_log_dir)
 

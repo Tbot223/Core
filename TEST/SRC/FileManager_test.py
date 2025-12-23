@@ -1,6 +1,7 @@
 # external Modules
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 
 # internal Modules
 from tbot223_core import FileManager
@@ -149,7 +150,17 @@ class TestFileManagerXfails:
         assert read_result.data["error"]["type"] == "FileNotFoundError", "Error is not FileNotFoundError for non-existent file."
 
 class TestFileManagerEdgeCases:
-    pass # Placeholder for future edge case tests
+    def test_atomic_write_failure_protection(self, file_manager, tmp_path):
+        target_file = tmp_path / "important_data.txt"
+        original_data = "This is some important data."
+        target_file.write_text(original_data)
+
+        with patch('os.replace') as mock_replace:
+            mock_replace.side_effect = OSError("Simulated replace failure")
+
+            result = file_manager.atomic_write(file_path=target_file, data="New data that won't be written.")
+            assert not result.success, "Atomic write unexpectedly succeeded despite replace failure."
+            assert target_file.read_text() == original_data, "Original data was altered despite atomic write failure." 
 
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
