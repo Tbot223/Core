@@ -1,13 +1,10 @@
-from tbot223_core.Utils import Utils
+from tbot223_core.AppCore import AppCore
 
-def test_insert_at_intervals():
-    print("Test: Insert at Intervals")
+ac = AppCore(is_logging_enabled=False)
 
-utils = Utils(is_logging_enabled=False)
-data_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-data_str = "ABCDEFGHIJ"
-result = utils.insert_at_intervals(data_str, 3, test_insert_at_intervals, at_start=False)
-if result.success:
-    print(result.data)
-else:
-    print(result.data)
+while(True):
+    input_int = input("Enter an integer (0 to exit, 1 to restart): ")
+    if input_int == '0':
+        ac.exit_application(pause=True)
+    elif input_int == '1':
+        ac.restart_application(pause=True)
