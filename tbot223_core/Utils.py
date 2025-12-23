@@ -36,14 +36,14 @@ class Utils:
     """
     
     def __init__(self, is_logging_enabled: bool=False,
-                 base_dir: Optional[Path]=None,
+                 base_dir: Union[str, Path]=None,
                  logger_manager_instance: Optional[LogSys.LoggerManager]=None, logger: Optional[logging.Logger]=None, 
                  log_instance: Optional[LogSys.Log]=None):
         """
         Initialize Utils class.
         """
         # Initialize Paths
-        self._BASE_DIR = base_dir or Path(__file__).resolve().parent.parent
+        self._BASE_DIR = Path(base_dir or Path.cwd() if Path.cwd().is_file() else Path.cwd().parent)
 
         # Initialize Flags
         self.is_logging_enabled = is_logging_enabled
@@ -476,7 +476,7 @@ class GlobalVars:
         object.__setattr__(self, '_lock', threading.RLock())
         
         # Initialize Paths
-        self._BASE_DIR = Path(base_dir or Path(__file__).resolve().parent.parent)
+        self._BASE_DIR = Path(base_dir or Path.cwd() if Path.cwd().is_file() else Path.cwd().parent)
 
         # Initialize Flags
         self.is_logging_enabled = is_logging_enabled

@@ -52,7 +52,7 @@ class AppCore:
                  log_instance: Optional[LogSys.Log]=None, filemanager: Optional[FileManager.FileManager]=None):
 
         # Initialize paths
-        self._PARENT_DIR = Path(base_dir or Path(__file__).resolve().parent.parent)
+        self._PARENT_DIR = Path(base_dir or Path.cwd() if Path.cwd().is_file() else Path.cwd().parent)
         self._LANG_DIR = self._PARENT_DIR / "Languages"
         Path.mkdir(self._LANG_DIR, exist_ok=True)
 
