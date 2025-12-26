@@ -11,9 +11,10 @@ def setup_module():
     """
     Fixture to create Utils, DecoratorUtils, and GlobalVars instances for testing.
     """
-    utils = Utils.Utils(is_logging_enabled=True, base_dir=Path(__file__).resolve().parent)
+    base_dir = Path(__file__).resolve().parent
+    utils = Utils.Utils(is_logging_enabled=True, base_dir=base_dir)
     decorator_utils = Utils.DecoratorUtils()
-    global_vars = Utils.GlobalVars(is_logging_enabled=True, base_dir=Path(__file__).resolve().parent)
+    global_vars = Utils.GlobalVars(is_logging_enabled=True, base_dir=base_dir)
     return utils, decorator_utils, global_vars
 
 @pytest.mark.usefixtures("setup_module")
@@ -327,7 +328,7 @@ class TestEdgeCases:
         iterations = 1000
 
         def increment_var():
-            with global_vars._lock:
+            with threading.RLock():
                 current_value = global_vars.get(key).data
                 global_vars.set(key, current_value + 1, overwrite=True)
 

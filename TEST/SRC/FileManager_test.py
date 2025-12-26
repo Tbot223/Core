@@ -11,7 +11,9 @@ def file_manager():
     """
     Fixture to create a FileManager instance for testing.
     """
-    return FileManager.FileManager(base_dir=Path(__file__).resolve().parent)
+    base_dir = Path(__file__).resolve().parent
+    file_manager = FileManager.FileManager(base_dir=base_dir)
+    return file_manager
 
 @pytest.mark.usefixtures("tmp_path", "file_manager")
 class TestFileManager:

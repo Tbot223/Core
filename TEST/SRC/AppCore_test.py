@@ -13,7 +13,8 @@ def test_appcore_initialization():
     """
     Fixture to initialize AppCore instance for testing.
     """
-    app_core = AppCore.AppCore(base_dir=Path(__file__).resolve().parent)
+    test_base_dir = Path(__file__).resolve().parent
+    app_core = AppCore.AppCore(base_dir=test_base_dir)
     return app_core
 
 @pytest.fixture(scope="module")
@@ -225,7 +226,9 @@ class TestCLIMethods:
         """
         Test the restart_application method to ensure it executes without errors.
         """
-        proc = subprocess.run(["python", "-c", "from tbot223_core import AppCore; app = AppCore.AppCore(is_logging_enabled=False); app.restart_application()"], capture_output=True)
+        test_base_dir = Path(__file__).resolve().parent
+        cmd = f"from tbot223_core import AppCore; app = AppCore.AppCore(is_logging_enabled=False, base_dir={str(test_base_dir)}); app.restart_application()"
+        proc = subprocess.run(["python", "-c", cmd], capture_output=True)
         assert proc.returncode in [0, 1, 2]  # Environment dependent, it may return different codes
 
 @pytest.mark.usefixtures("tmp_path", "test_appcore_initialization", "helper_methods")
