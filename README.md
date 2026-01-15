@@ -10,6 +10,7 @@ A comprehensive utility package providing core functionalities for Python applic
 - **Exception Tracking**: Detailed error tracking with system information and context
 - **Utility Functions**: Encryption, path handling, parallel execution, and more
 - **Multi-language Support**: Built-in localization support
+- **Shared Memory IPC**: Inter-process communication via shared memory with process-safe locking
 
 ## Installation
 
@@ -24,58 +25,65 @@ Python 3.10 - 3.12
 ## Core Modules
 
 ### AppCore
-Provides core application functionalities including:
-- Parallel execution (thread/process pools)
-- Console management (clear console)
-- Application lifecycle control (restart, exit)
-- Localization support (multi-language text retrieval)
+Provides core application functionalities:
+- Parallel execution with `ThreadPoolExecutor` / `ProcessPoolExecutor`
+- Console management (`clear_console()`)
+- Application lifecycle control (`restart_application()`, `exit_application()`)
+- Multi-language text retrieval (`get_text_by_lang()`)
 - Safe CLI input with validation and type conversion
 
 ### FileManager
 Safe and reliable file operations:
-- Atomic file writing
-- File read operations (text and binary modes)
-- JSON read/write operations
-- File/directory listing with extension filtering
+- Atomic file writing (`atomic_write()`)
+- File read operations (`read_file()`) with text/binary modes
+- JSON read/write operations (`read_json()`, `write_json()`)
+- File/directory listing with extension filtering (`list_of_files()`)
 - File/directory existence checking
-- Safe file/directory deletion
-- Directory creation with parent support
-- Cross-platform file locking
+- Safe file/directory deletion (`delete_file()`, `delete_directory()`)
+- Directory creation with parent support (`create_directory()`)
+- Cross-platform file locking (`_lock()`)
 
 ### LogSys
 Structured logging system:
-- Logger management with automatic file organization
+- Logger management with automatic file organization (`LoggerManager`)
 - Time-stamped log files
 - Configurable log levels
-- Centralized log instances
+- Centralized log instances (`Log`)
+- Simple setup helper (`SimpleSetting`)
 
 ### Utils
 Collection of utility functions:
-- Path conversions
-- Encryption (md5, sha1, sha256, sha512)
-- PBKDF2 HMAC hash generation and verification
-- List/string manipulation (insert at intervals)
-- Dictionary operations (find keys by value with comparison operators)
+- Path conversions (`str_to_path()`)
+- Encryption (`encrypt()`) - md5, sha1, sha256, sha512
+- PBKDF2 HMAC hash generation and verification (`pbkdf2_hmac()`, `verify_pbkdf2_hmac()`)
+- List/string manipulation (`insert_at_intervals()`)
+- Dictionary operations (`find_keys_by_value()`) with comparison operators
 
-#### GlobalVars
-Thread-safe global variable management:
-- Set, get, and delete variables
-- Variable existence checking
-- List all variables
-- Attribute access syntax support
-- Call syntax for get/set operations
+### GlobalVars
+Thread-safe global variable management with shared memory support:
+- Variable operations (`set()`, `get()`, `delete()`, `clear()`)
+- Variable existence checking (`exists()`, `list_vars()`)
+- Attribute access syntax support (`gv.key = value`)
+- Call syntax for get/set operations (`gv("key", value)`)
+- Shared memory creation (`shm_gen()`) with optional `multiprocessing.Lock`
+- Shared memory synchronization (`shm_sync()`, `shm_update()`)
+- Shared memory access with LRU cache (`shm_get()`, `shm_cache_management()`)
+- Shared memory cleanup (`shm_close()`)
+- Context manager support (`with gv:`) for thread-safe operations
+- Internal thread lock access (`lock()`)
 
-#### DecoratorUtils
+### DecoratorUtils
 Utility decorators:
-- Runtime measurement decorator
+- Runtime measurement decorator (`runtime()`)
 
 ### ExceptionTracker
 Comprehensive error tracking:
-- Exception location tracking (file, line, function)
+- Exception location tracking (`get_exception_location()`)
+- Detailed exception info with system context (`get_exception_info()`)
+- Standardized exception return (`get_exception_return()`)
 - System information caching (OS, architecture, Python version)
-- Detailed error context with timestamps and traceback
 - Information masking support for sensitive data
-- Decorator for automatic exception handling
+- Decorator for automatic exception handling (`ExceptionTrackerDecorator`)
 
 ## Result Object
 
@@ -166,6 +174,45 @@ tasks = [
     (anotherfunc, {"some_arg1": val1, "some_arg1": val2})
 ]
 result = app.thread_pool_executor(tasks, workers=4)
+```
+
+## Shared Memory Usage
+
+```python
+from tbot223_core.Utils import GlobalVars
+from multiprocessing import Process
+
+# Worker function (must be defined at module level)
+def worker(shm_name, lock):
+    gv_worker = GlobalVars()
+    with lock:
+        gv_worker.shm_update(shm_name)
+        current = gv_worker.get("counter").data
+        gv_worker.set("counter", current + 1, overwrite=True)
+        gv_worker.shm_sync(shm_name)
+
+if __name__ == "__main__":
+    # Main process - all setup must be inside __main__ guard
+    gv = GlobalVars()
+    result = gv.shm_gen("my_shm", size=4096, create_lock=True)
+    shm_lock = result.data  # Get the lock for inter-process sync
+
+    gv.set("counter", 0, overwrite=True)
+    gv.shm_sync("my_shm")
+
+    # Start processes (lock must be passed before fork/spawn)
+    processes = [Process(target=worker, args=("my_shm", shm_lock)) for _ in range(4)]
+    for p in processes:
+        p.start()
+    for p in processes:
+        p.join()
+
+    # Check result
+    gv.shm_update("my_shm")
+    print(f"Final counter: {gv.get('counter').data}")  # Output: 4
+
+    # Cleanup
+    gv.shm_close("my_shm")
 ```
 
 ## License

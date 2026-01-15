@@ -5,6 +5,8 @@ import time
 import hashlib, secrets
 import logging
 import threading
+from multiprocessing import RLock, shared_memory, Lock
+import pickle
 
 # internal Modules
 from tbot223_core.Result import Result
@@ -437,7 +439,7 @@ class GlobalVars:
             Check if a global variable exists.
 
         # internal Methods
-        - __getattr__(name) 
+        - __getattr__(name)
             Get a global variable by attribute access.
 
         - __setattr__(name, value)
@@ -445,6 +447,32 @@ class GlobalVars:
 
         - __call__(key: str, value: Optional[object], overwrite: bool) -> Result 
             Get or set a global variable using call syntax.
+
+        - __enter__() -> GlobalVars
+            Enter the runtime context related to this object.
+
+        - __exit__(exc_type, exc_value, traceback) -> None
+            Exit the runtime context related to this object.
+
+        # shared memory Methods
+
+        - shm_cache_management(name: Optional[str], shm: Optional[shared_memory.SharedMemory]) -> Result
+            Internal method to manage shared memory cache.
+
+        - shm_gen(name: str, size: int) -> Result
+            Generate a shared memory object for global variables.
+
+        - shm_close(name: str) -> Result
+            Close a shared memory object for global variables.
+        
+        - shm_update(name: str) -> Result
+            Update the current object's variables from the shared memory object.
+
+        - shm_sync(name: str) -> Result
+            Synchronize the current object's variables to the shared memory object.
+
+        - lock() -> RLock
+            Get the RLock object for synchronizing access to global variables.
 
     Example:
         >>> globals = GlobalVars()
@@ -467,13 +495,14 @@ class GlobalVars:
     """
     
     def __init__(self, is_logging_enabled: bool=False, base_dir: Union[str, Path]=None,
+                 shared_memory_cache_max_size: int=5,
                  logger_manager_instance: Optional[LogSys.LoggerManager]=None, logger: Optional[logging.Logger]=None, 
                  log_instance: Optional[LogSys.Log]=None):
         
         # Set initialization flag to bypass __setattr__ during __init__
         object.__setattr__(self, '__initializing__', True)
         object.__setattr__(self, '__vars__', {})
-        object.__setattr__(self, '__lock__', threading.RLock())
+        object.__setattr__(self, '__lock__', RLock())
         
         # Initialize Paths
         self._BASE_DIR = Path(base_dir) if base_dir is not None else Path.cwd()
@@ -490,7 +519,12 @@ class GlobalVars:
             self._logger_manager.make_logger("GlobalVarsLogger")
             self._logger = logger or self._logger_manager.get_logger("GlobalVarsLogger").data
         self.log = log_instance or LogSys.Log(logger=self._logger)
-        
+
+        # Shared Memory Attributes
+        self.__shm_name__ = {}
+        self.__shm_cache__ = {}
+        self.__shm_cache_max_size__ = shared_memory_cache_max_size
+
         # Initialization complete
         object.__setattr__(self, '__initializing__', False)
         
@@ -760,3 +794,247 @@ class GlobalVars:
                 return self.get(key)
         except Exception as e:
             return self._exception_tracker.get_exception_return(e)
+        
+    def shm_cache_management(self, name: Optional[str], shm: Optional[shared_memory.SharedMemory]) -> Result:
+        """
+        Internal method to manage shared memory cache.
+
+        Args:
+            - name: The name of the shared memory object.
+            - shm: The shared memory object.
+            if name and shm are provided, it adds/updates the cache.
+            if both are None, it clears the cache.
+
+        Returns:
+            Result: A Result object indicating success or failure.
+
+        Example:
+            >>> gv = GlobalVars()
+            >>> shm = shared_memory.SharedMemory(name="my_shm")
+            >>> gv.__shm_cache_management__("my_shm", shm)
+            >>> # Manages the shared memory cache for "my_shm".
+            >>>
+            >>> for i in range(6):
+            >>>     shm = shared_memory.SharedMemory(name=f"shm_{i}")
+            >>>     gv.__shm_cache_management__(f"shm_{i}", shm)
+            >>> # The cache will only keep the 5 most recent shared memory objects.
+        """
+        try:
+            if len(self.__shm_cache__) >= self.__shm_cache_max_size__:
+                oldest_key = next(iter(self.__shm_cache__))
+                del self.__shm_cache__[oldest_key]
+                self.log.log_message("INFO", f"Shared memory cache for '{oldest_key}' removed due to cache size limit.")
+
+            if name not in self.__shm_cache__ and shm is not None:
+                self.__shm_cache__[name] = shm
+                self.log.log_message("INFO", f"Shared memory cache for '{name}' created.")
+            elif name in self.__shm_cache__ and shm is not None:
+                self.__shm_cache__[name] = shm
+                self.log.log_message("INFO", f"Shared memory cache for '{name}' updated.")
+            elif name is None and shm is None:
+                self.__shm_cache__.clear()
+                self.log.log_message("INFO", "All shared memory caches cleared.")
+            else:
+                self.log.log_message("INFO", f"Shared memory cache for '{name}' accessed.")
+
+            return Result(True, None, None, "success to manage shared memory cache")
+        except Exception as e:
+            self.log.log_message("ERROR", f"Failed to manage shared memory cache: {e}")
+            return self._exception_tracker.get_exception_return(e)
+
+    def shm_gen(self, name: str=None, size: int=1024, create_lock: bool=False) -> Result:
+        """
+        Generate a shared memory object for inter-process communication.
+
+        Args:
+            - name: The name of the shared memory object.
+            - size: The size of the shared memory object in bytes.
+            - create_lock: If True, create a multiprocessing.Lock for inter-process synchronization.
+
+        Returns:
+            Result: A Result object.
+                - If create_lock is False: data contains success message.
+                - If create_lock is True: data contains the multiprocessing.Lock object.
+                  (This lock must be passed to child processes before fork/spawn for synchronization)
+        
+        Example:
+            >>> # Without lock (default)
+            >>> gv.shm_gen("my_shm", size=4096)
+            >>> 
+            >>> # With lock for inter-process synchronization
+            >>> result = gv.shm_gen("my_shm", size=4096, create_lock=True)
+            >>> shm_lock = result.data  # Pass this to child processes
+            >>> 
+            >>> # In child process, use the lock:
+            >>> with shm_lock:
+            >>>     gv.shm_update("my_shm")
+            >>>     # ... modify ...
+            >>>     gv.shm_sync("my_shm")
+        """
+        try:
+            try:
+                shm = shared_memory.SharedMemory(create=True, size=size, name=name)
+            except FileExistsError:
+                shm = shared_memory.SharedMemory(name=name)
+            self.__shm_name__[name] = shm.name
+            self.log.log_message("INFO", f"Shared memory object '{shm.name}' created.")
+            
+            if create_lock:
+                lock = Lock()
+                return Result(True, None, None, lock)
+            return Result(True, None, None, "success to create shared memory object")
+        except Exception as e:
+            self.log.log_message("ERROR", f"Failed to create shared memory object: {e}")
+            return self._exception_tracker.get_exception_return(e)
+        
+    def shm_get(self, name: str) -> Result:
+        """
+        Get an existing shared memory object by name.
+
+        Args:
+            - name: The name of the shared memory object.
+
+        Returns:
+            shared_memory.SharedMemory: The existing shared memory object.
+
+        Example:
+            >>> gv = GlobalVars()
+            >>> gv.shm_gen("my_shm", size=4096)
+            >>> shm = gv.shm_get("my_shm").data
+            >>> print(shm.name)  # Output: my_shm
+        """
+        try:
+            if name not in self.__shm_cache__:
+                self.log.log_message("WARNING", f"Shared memory object '{name}' not found in cache.")
+                shm = shared_memory.SharedMemory(name=name)
+                self.shm_cache_management(name, shm)
+                self.log.log_message("INFO", f"Shared memory object '{name}' created and added to cache.")
+                return Result(True, None, None, shm)
+            shm = self.__shm_cache__[name]
+            self.log.log_message("INFO", f"Shared memory object '{name}' retrieved from cache.")
+            return Result(True, None, None, shm)
+        except Exception as e:
+            self.log.log_message("ERROR", f"Failed to retrieve shared memory object '{name}' from cache: {e}")
+            return self._exception_tracker.get_exception_return(e)
+        
+    def shm_sync(self, name: str) -> Result:
+        """
+        Synchronize the current object's variables to the shared memory object.
+
+        Args:
+            - name: The name of the shared memory object.
+
+        Returns:
+            Result: A Result object indicating success or failure.
+
+        Example:
+            >>> gv = GlobalVars()
+            >>> gv.shm_gen("my_shm", size=4096)
+            >>> gv.some_variable = 42
+            >>> gv.shm_sync("my_shm")
+            >>> # In another process:
+            >>> gv.shm_update("my_shm")
+            >>> print(gv.some_variable)  # Output: 42
+        """
+        try:
+            byte_dict = pickle.dumps(self.__vars__)
+            shm = self.shm_get(name).data
+
+            if len(byte_dict) > shm.size:
+                raise ValueError("Serialized object size exceeds shared memory size.")
+            shm.buf[:len(byte_dict)] = byte_dict
+
+            self.log.log_message("INFO", f"Shared memory object '{name}' synchronized.")
+            return Result(True, None, None, "success to synchronize shared memory object")
+        except Exception as e:
+            self.log.log_message("ERROR", f"Failed to synchronize shared memory object '{name}': {e}")
+            return self._exception_tracker.get_exception_return(e)
+        
+    def shm_update(self, name: str) -> Result:
+        """
+        Update the current object's variables from the shared memory object.
+        
+        Args:
+            - name: The name of the shared memory object.
+
+        Returns:
+            Result: A Result object indicating success or failure.
+
+        Example:
+            >>> gv = GlobalVars()
+            >>> gv.shm_gen("my_shm", size=4096)
+            >>> gv.some_variable = 42
+            >>> gv.shm_sync("my_shm")
+            >>> # In another process:
+            >>> gv.shm_update("my_shm")
+            >>> print(gv.some_variable)  # Output: 42
+        """
+        try:
+            shm = self.shm_get(name).data
+            byte_dict = bytes(shm.buf[:shm.size]).rstrip(b'\x00')
+            obj_dict = pickle.loads(byte_dict)
+
+            with self.__lock__:
+                self.__vars__.update(obj_dict)
+
+            self.log.log_message("INFO", f"Shared memory object '{name}' updated.")
+            return Result(True, None, None, "success to update from shared memory object")
+        except Exception as e:
+            self.log.log_message("ERROR", f"Failed to update from shared memory object '{name}': {e}")
+            return self._exception_tracker.get_exception_return(e)
+        
+    def shm_close(self, name: str) -> Result:
+        """
+        Close and unlink the shared memory object.
+
+        Args:
+            - name: The name of the shared memory object.
+
+        Returns:
+            Result: A Result object indicating success or failure.
+
+        Example:
+            >>> gv = GlobalVars()
+            >>> gv.shm_gen("my_shm", size=4096)
+            >>> gv.shm_close("my_shm")
+        """
+        try:
+            if self.__shm_name__[name] != name:
+                raise ValueError("Shared memory name does not match the created one.")
+            shm = self.shm_get(name).data
+            shm.close()
+            shm.unlink()
+            self.__shm_name__.pop(name, None)
+            self.__shm_cache__.pop(name, None)
+
+            self.log.log_message("INFO", f"Shared memory object '{name}' closed and unlinked.")
+            return Result(True, None, None, "success to close shared memory object")
+        except Exception as e:
+            self.log.log_message("ERROR", f"Failed to close shared memory object '{name}': {e}")
+            return self._exception_tracker.get_exception_return(e)
+        
+    def lock(self) -> RLock: # type: ignore
+        """
+        Get the RLock object for synchronizing access to global variables.
+
+        Args:
+            None
+
+        Returns:
+            multiprocessing.RLock: The RLock object.
+            (For the user's convenience, this function does not specifically use the Result pattern.)
+
+        Example:
+            >>> gv = GlobalVars()
+            >>> with gv.lock():
+            >>>     gv.set("counter", gv.get("counter").data + 1, overwrite=True)
+            >>>     # Critical section to safely modify 'counter'
+        """
+        return self.__lock__
+    
+    def __enter__(self):
+        self.__lock__.acquire()
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.__lock__.release()
