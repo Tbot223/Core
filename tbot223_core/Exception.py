@@ -4,7 +4,7 @@ import os
 import platform
 import time
 import traceback
-from typing import Any
+from typing import Any, Tuple
 
 # internal modules
 from tbot223_core.Result import Result
@@ -64,9 +64,9 @@ class ExceptionTracker():
             return Result(True, None, None, f"'{frame.filename}', line {frame.lineno}, in {frame.name}")
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_location, R23-54", traceback.format_exc())
+            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_location, R42-67", traceback.format_exc())
 
-    def get_exception_info(self, error: Exception, user_input: Any=None, params: dict=None, masking: bool=False) -> Result:
+    def get_exception_info(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=None, masking: bool=False) -> Result:
         """
         Function to track exception information and return related information
         
@@ -76,7 +76,7 @@ class ExceptionTracker():
         Args:
             - error (Exception): The exception object to track.
             - user_input (Any, optional): User input context related to the exception. Defaults to None.
-            - params (dict, optional): Additional parameters related to the exception. Defaults to None.
+            - params (Tuple[Tuple, dict], optional): Additional parameters related to the exception. Defaults to None. expected format: (args, kwargs)
             - masking (bool, optional): If True, computer information will be masked. Defaults to False.
 
         Returns:
@@ -91,7 +91,7 @@ class ExceptionTracker():
             >>>     # This will raise a ZeroDivisionError
             >>>     divide(a, b)
             >>> except Exception as e:
-            >>>     info_result = tracker.get_exception_info(e, user_input="Divide operation", params={"a": a, "b": b}, masking=False)
+            >>>     info_result = tracker.get_exception_info(e, user_input="Divide operation", params=((a, b), {"a":a, "b":b}), masking=False)
             >>>     print(info_result.data)
             >>> # Output: ( error_info dict, see Readme.md for structure )
         """
@@ -120,9 +120,9 @@ class ExceptionTracker():
             return Result(True, None, None, error_info)
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_info, R56-90", traceback.format_exc())
+            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_info, R69-123", traceback.format_exc())
         
-    def get_exception_return(self, error: Exception, user_input: Any=None, params: dict=None, masking: bool=False) -> dict:
+    def get_exception_return(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=None, masking: bool=False) -> Result:
         """
         A convenience function to standardize the return of exception information. It's designed to be used in exception handling blocks.
         ( Includes exception type, message, location, and detailed info. )
@@ -134,7 +134,7 @@ class ExceptionTracker():
         Args:
             - error (Exception): The exception object to track.
             - user_input (Any, optional): User input context related to the exception. Defaults to None.
-            - params (dict, optional): Additional parameters related to the exception. Defaults to None.
+            - params (Tuple[Tuple, dict], optional): Additional parameters related to the exception. Defaults to None. expected format: (args, kwargs)
             - masking (bool, optional): If True, exception information will be masked. Defaults to False.
 
         Returns:
@@ -144,14 +144,14 @@ class ExceptionTracker():
             >>> try:
             >>>     1 / 0
             >>> except Exception as e:
-            >>>     print(tracker.get_exception_return(e, user_input="Divide operation", params={"a":1, "b":0}, True))
+            >>>     print(tracker.get_exception_return(e, user_input="Divide operation", params=((1, 0), {"a":1, "b":0}), True))
             >>> Result(False, 'ZeroDivisionError :division by zero', "'script.py', line 10, in <module>", '<Masked>')
         """
         try:
             return Result(False, f"{type(error).__name__} :{str(error)}", self.get_exception_location(error).data, self.get_exception_info(error, user_input, params).data if not masking else "<Masked>")
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, R92-105", traceback.format_exc())
+            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, R125-155", traceback.format_exc())
         
 class ExceptionTrackerDecorator():
     """
@@ -166,8 +166,10 @@ class ExceptionTrackerDecorator():
         >>> @ExceptionTrackerDecorator(masking=True, tracker=tracker)
         >>> def risky_function(x, y):
         >>>     return x / y
-        >>> print(risky_function(10, 0))
+        >>> print(risky_function(10, y=0))
         >>> # Output: Result(False, 'ZeroDivisionError :division by zero', "'script.py', line 10, in risky_function", '<Masked>')
+        >>> print(risky_function(10, y=0).data['params'])
+        >>> # Output: ((10,), {'y': 0})
     """
     def __init__(self, masking: bool=False, tracker: ExceptionTracker=None):
         self.tracker = tracker or ExceptionTracker()
@@ -178,6 +180,6 @@ class ExceptionTrackerDecorator():
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                return self.tracker.get_exception_return(error=e, params=kwargs, masking=self.masking)
+                return self.tracker.get_exception_return(error=e, params=(args, kwargs), masking=self.masking)
         return wrapper
     
