@@ -66,9 +66,10 @@ Thread-safe global variable management with shared memory support:
 - Attribute access syntax support (`gv.key = value`)
 - Call syntax for get/set operations (`gv("key", value)`)
 - Shared memory creation (`shm_gen()`) with optional `multiprocessing.Lock`
+- Shared memory connection for child processes (`shm_connect()`)
 - Shared memory synchronization (`shm_sync()`, `shm_update()`)
 - Shared memory access with LRU cache (`shm_get()`, `shm_cache_management()`)
-- Shared memory cleanup (`shm_close()`)
+- Shared memory cleanup (`shm_close()`) with optional `close_only` mode
 - Context manager support (`with gv:`) for thread-safe operations
 - Internal thread lock access (`lock()`)
 
