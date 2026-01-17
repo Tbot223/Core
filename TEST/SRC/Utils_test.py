@@ -2,6 +2,7 @@
 import pytest
 from pathlib import Path
 import time, random, os, threading
+from multiprocessing import shared_memory
 
 # internal Modules
 from tbot223_core import Utils
@@ -326,9 +327,10 @@ class TestEdgeCases:
         global_vars.set(key, 0)
 
         iterations = 1000
+        lock = threading.RLock()
 
         def increment_var():
-            with threading.RLock():
+            with lock:
                 current_value = global_vars.get(key).data
                 global_vars.set(key, current_value + 1, overwrite=True)
 

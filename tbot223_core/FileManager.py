@@ -65,14 +65,14 @@ class FileManager:
         self._BASE_DIR = Path(base_dir) if base_dir is not None else Path.cwd()
 
         # Initialize Flags
-        self.is_logging_enabled = is_logging_enabled
+        self.__is_logging_enabled__ = is_logging_enabled
         self.is_debug_enabled = is_debug_enabled
 
         # Initialize classes
         self._exception_tracker = ExceptionTracker()
         self._logger_manager = None
         self.logger = None
-        if self.is_logging_enabled:
+        if self.__is_logging_enabled__:
             self._logger_manager = logger_manager_instance or LogSys.LoggerManager(base_dir=self._BASE_DIR / "logs", second_log_dir="file_manager")
             self._logger_manager.make_logger("FileManagerLogger")
             self.logger = logger or self._logger_manager.get_logger("FileManagerLogger").data

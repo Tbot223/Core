@@ -57,14 +57,14 @@ class AppCore:
         Path.mkdir(self._LANG_DIR, exist_ok=True)
 
         # Initialize Flags
-        self.is_logging_enabled = is_logging_enabled
+        self.__is_logging_enabled__ = is_logging_enabled
         self.is_debug_enabled = is_debug_enabled
 
         # Initialize classes
         self._exception_tracker = ExceptionTracker()
         self._logger_manager = None
         self.logger = None
-        if self.is_logging_enabled:
+        if self.__is_logging_enabled__:
             self._logger_manager = logger_manager_instance or LogSys.LoggerManager(base_dir=self._PARENT_DIR / "logs", second_log_dir="app_core")
             self._logger_manager.make_logger("AppCoreLogger")
             self.logger = logger or self._logger_manager.get_logger("AppCoreLogger").data

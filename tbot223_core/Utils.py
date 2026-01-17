@@ -48,13 +48,13 @@ class Utils:
         self._BASE_DIR = Path(base_dir or Path.cwd())
 
         # Initialize Flags
-        self.is_logging_enabled = is_logging_enabled
+        object.__setattr__(self, '__is_logging_enabled__', is_logging_enabled)
 
         # Initialize Classes
         self._exception_tracker = ExceptionTracker()
         self._logger_manager = None
         self._logger = None
-        if self.is_logging_enabled:
+        if self.__is_logging_enabled__:
             self._logger_manager = logger_manager_instance or LogSys.LoggerManager(base_dir=self._BASE_DIR / "logs", second_log_dir="utils")
             self._logger_manager.make_logger("UtilsLogger")
             self._logger = logger or self._logger_manager.get_logger("UtilsLogger").data
@@ -514,20 +514,20 @@ class GlobalVars:
         self._BASE_DIR = Path(base_dir) if base_dir is not None else Path.cwd()
 
         # Initialize Flags
-        self.is_logging_enabled = is_logging_enabled
+        self.__is_logging_enabled__ = is_logging_enabled
 
         # Initialize Classes
         self._exception_tracker = ExceptionTracker()
         self._logger_manager = None
         self._logger = None
-        if self.is_logging_enabled:
+        if self.__is_logging_enabled__:
             self._logger_manager = logger_manager_instance or LogSys.LoggerManager(base_dir=self._BASE_DIR / "logs", second_log_dir="global_vars")
             self._logger_manager.make_logger("GlobalVarsLogger")
             self._logger = logger or self._logger_manager.get_logger("GlobalVarsLogger").data
         self.log = log_instance or LogSys.Log(logger=self._logger)
 
         # Shared Memory Attributes
-        self.__shm_name__ = {}
+        self.__shm_name__ = set()
         self.__shm_cache__ = {}
         self.__shm_cache_max_size__ = shared_memory_cache_max_size
 
@@ -556,16 +556,19 @@ class GlobalVars:
         """
         try:
             with self.__lock__:
-                if self.exists(key).data and not overwrite:
+                # inline existence check to avoid extra lock/log overhead from exists()
+                if key in self.__vars__ and not overwrite:
                     raise KeyError(f"Global variable '{key}' already exists.")
                 if key is None or not isinstance(key, str) or key.strip() == "":
                     raise ValueError("key must be a non-empty string.")
-                
+
                 self.__vars__[key] = value
-                self.log.log_message("INFO", f"Global variable '{key}' set.")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("INFO", f"Global variable '{key}' set.")
                 return Result(True, None, None, f"Global variable '{key}' set.")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to set global variable '{key}': {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to set global variable '{key}': {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def get(self, key: str) -> Result:
@@ -589,13 +592,15 @@ class GlobalVars:
         """
         try:
             with self.__lock__:
-                if not self.exists(key):
+                if key not in self.__vars__:
                     raise KeyError(f"Global variable '{key}' does not exist.")
-                
-                self.log.log_message("INFO", f"Global variable '{key}' accessed.")
+
+                if self.__is_logging_enabled__:
+                    self.log.log_message("INFO", f"Global variable '{key}' accessed.")
                 return Result(True, None, None, self.__vars__[key])
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to get global variable '{key}': {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to get global variable '{key}': {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def delete(self, key: str) -> Result:
@@ -619,14 +624,16 @@ class GlobalVars:
         """
         try:
             with self.__lock__:
-                if not self.exists(key):
+                if key not in self.__vars__:
                     raise KeyError(f"Global variable '{key}' does not exist.")
-                
+
                 del self.__vars__[key]
-                self.log.log_message("INFO", f"Global variable '{key}' deleted.")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("INFO", f"Global variable '{key}' deleted.")
                 return Result(True, None, None, f"Global variable '{key}' deleted.")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to delete global variable '{key}': {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to delete global variable '{key}': {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def clear(self) -> Result:
@@ -651,10 +658,12 @@ class GlobalVars:
                 for name in list(self.__vars__.keys()):
                     del self.__vars__[name]
 
-                self.log.log_message("INFO", "All global variables cleared.")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("INFO", "All global variables cleared.")
                 return Result(True, None, None, "All global variables cleared.")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to clear global variables: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to clear global variables: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def list_vars(self) -> Result:
@@ -676,10 +685,12 @@ class GlobalVars:
         """
         try:
             with self.__lock__:
-                self.log.log_message("INFO", "Listing all global variables.")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("INFO", "Listing all global variables.")
                 return Result(True, None, None, list(self.__vars__.keys()))
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to list global variables: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to list global variables: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def exists(self, key: str) -> Result:
@@ -704,10 +715,12 @@ class GlobalVars:
         try:
             with self.__lock__:
                 exists = key in self.__vars__
-                self.log.log_message("INFO", f"Checked existence of global variable '{key}': {exists}")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("INFO", f"Checked existence of global variable '{key}': {exists}")
                 return Result(True, None, None, exists)
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to check existence of global variable '{key}': {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to check existence of global variable '{key}': {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def __getattr__(self, name):
@@ -727,7 +740,7 @@ class GlobalVars:
         """
         try:
             with object.__getattribute__(self, '__lock__'):
-                if not self.exists(name).data:
+                if name not in self.__vars__:
                     raise KeyError(f"Global variable '{name}' does not exist.")
                 return self.__vars__[name]
         except Exception as e:
@@ -826,31 +839,41 @@ class GlobalVars:
             >>> # The cache will only keep the 5 most recent shared memory objects.
         """
         try:
+            if name is not None and not isinstance(name, str):
+                raise ValueError("name must be a string or None")
+            if shm is not None and not isinstance(shm, shared_memory.SharedMemory):
+                raise ValueError("shm must be a shared_memory.SharedMemory object or None")
             with self.__lock__:
                 if len(self.__shm_cache__) >= self.__shm_cache_max_size__:
                     oldest_key = next(iter(self.__shm_cache__))
                     self.__shm_cache__[oldest_key].close()
                     del self.__shm_cache__[oldest_key]
-                    self.log.log_message("INFO", f"Shared memory cache for '{oldest_key}' removed due to cache size limit.")
+                    if self.__is_logging_enabled__:
+                        self.log.log_message("INFO", f"Shared memory cache for '{oldest_key}' removed due to cache size limit.")
 
                 if name not in self.__shm_cache__ and shm is not None:
                     self.__shm_cache__[name] = shm
-                    self.log.log_message("INFO", f"Shared memory cache for '{name}' created.")
+                    if self.__is_logging_enabled__:
+                        self.log.log_message("INFO", f"Shared memory cache for '{name}' created.")
                 elif name in self.__shm_cache__ and shm is not None:
                     self.__shm_cache__[name] = shm
-                    self.log.log_message("INFO", f"Shared memory cache for '{name}' updated.")
+                    if self.__is_logging_enabled__:
+                        self.log.log_message("INFO", f"Shared memory cache for '{name}' updated.")
                 elif name is None and shm is None:
                     self.__shm_cache__.clear()
-                    self.log.log_message("INFO", "All shared memory caches cleared.")
+                    if self.__is_logging_enabled__:
+                        self.log.log_message("INFO", "All shared memory caches cleared.")
                 else:
                     shm_obj = self.__shm_cache__.get(name)
                     self.__shm_cache__.pop(name, None)
                     self.__shm_cache__[name] = shm_obj
-                    self.log.log_message("INFO", f"Shared memory cache for '{name}' accessed.")
+                    if self.__is_logging_enabled__:
+                        self.log.log_message("INFO", f"Shared memory cache for '{name}' accessed.")
 
             return Result(True, None, None, "success to manage shared memory cache")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to manage shared memory cache: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to manage shared memory cache: {e}")
             return self._exception_tracker.get_exception_return(e)
 
     def shm_gen(self, name: str=None, size: int=1024, create_lock: bool=True) -> Result:
@@ -884,20 +907,27 @@ class GlobalVars:
             >>>     gv.shm_sync("my_shm")
         """
         try:
+            if name is None or not isinstance(name, str) or name.strip() == "":
+                raise ValueError("name must be a non-empty string.")
+            if not isinstance(size, int) or size <= 0:
+                raise ValueError("size must be a positive integer.")
+            
             try:
                 shm = shared_memory.SharedMemory(create=True, size=size, name=name)
             except FileExistsError:
                 shm = shared_memory.SharedMemory(name=name)
-            self.__shm_name__[name] = shm.name
+            self.__shm_name__.add(name)
             self.shm_cache_management(name, shm)  # Keep reference to prevent GC
-            self.log.log_message("INFO", f"Shared memory object '{shm.name}' created.")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Shared memory object '{shm.name}' created.")
             
             if create_lock:
                 lock = Lock()
                 return Result(True, None, None, lock)
             return Result(True, None, None, "success to create shared memory object")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to create shared memory object: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to create shared memory object: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def shm_connect(self, name: str) -> Result:
@@ -932,15 +962,18 @@ class GlobalVars:
                 return res
 
             if name not in self.__shm_name__:
-                self.__shm_name__[name] = name
+                self.__shm_name__.add(name)
 
-            self.log.log_message("INFO", f"Connected to shared memory object '{name}'.")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Connected to shared memory object '{name}'.")
             return Result(True, None, None, f"Connected to shared memory object '{name}'.")
         except FileNotFoundError:
-            self.log.log_message("ERROR", f"Shared memory object '{name}' does not exist.")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Shared memory object '{name}' does not exist.")
             return Result(False, "FileNotFoundError", f"Shared memory object '{name}' does not exist.", None)
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to connect to shared memory object '{name}': {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to connect to shared memory object '{name}': {e}")
             return self._exception_tracker.get_exception_return(e)
 
     def shm_get(self, name: str) -> Result:
@@ -961,16 +994,20 @@ class GlobalVars:
         """
         try:
             if name not in self.__shm_cache__:
-                self.log.log_message("WARNING", f"Shared memory object '{name}' not found in cache.")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("WARNING", f"Shared memory object '{name}' not found in cache.")
                 shm = shared_memory.SharedMemory(name=name)
                 self.shm_cache_management(name, shm)
-                self.log.log_message("INFO", f"Shared memory object '{name}' created and added to cache.")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("INFO", f"Shared memory object '{name}' created and added to cache.")
                 return Result(True, None, None, shm)
             shm = self.__shm_cache__[name]
-            self.log.log_message("INFO", f"Shared memory object '{name}' retrieved from cache.")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Shared memory object '{name}' retrieved from cache.")
             return Result(True, None, None, shm)
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to retrieve shared memory object '{name}' from cache: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to retrieve shared memory object '{name}' from cache: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def shm_sync(self, name: str) -> Result:
@@ -1011,10 +1048,12 @@ class GlobalVars:
             shm.buf[:header_size] = struct.pack('Q', data_len)
             shm.buf[header_size:header_size+data_len] = byte_dict
 
-            self.log.log_message("INFO", f"Shared memory object '{name}' synchronized.")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Shared memory object '{name}' synchronized.")
             return Result(True, None, None, "success to synchronize shared memory object")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to synchronize shared memory object '{name}': {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to synchronize shared memory object '{name}': {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def shm_update(self, name: str) -> Result:
@@ -1044,7 +1083,8 @@ class GlobalVars:
             (data_len,) = struct.unpack('Q', packed_len)
 
             if data_len == 0:
-                self.log.log_message("WARNING", f"No data found in shared memory object '{name}'.")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("WARNING", f"No data found in shared memory object '{name}'.")
                 return Result(True, None, None, "no data to update from shared memory object")
             
             byte_dict = bytes(shm.buf[header_size:header_size+data_len])
@@ -1057,10 +1097,12 @@ class GlobalVars:
             with self.__lock__:
                 self.__vars__.update(obj_dict)
 
-            self.log.log_message("INFO", f"Shared memory object '{name}' updated.")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Shared memory object '{name}' updated.")
             return Result(True, None, None, "success to update from shared memory object")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to update from shared memory object '{name}': {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to update from shared memory object '{name}': {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def shm_close(self, name: str, close_only: bool = False) -> Result:
@@ -1086,13 +1128,15 @@ class GlobalVars:
             shm.close()
             if not close_only:
                 shm.unlink()
-                self.__shm_name__.pop(name, None)
+                self.__shm_name__.discard(name)
             self.__shm_cache__.pop(name, None)
 
-            self.log.log_message("INFO", f"Shared memory object '{name}' closed and unlinked.")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Shared memory object '{name}' closed and unlinked.")
             return Result(True, None, None, "success to close shared memory object")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to close shared memory object '{name}': {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to close shared memory object '{name}': {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def lock(self) -> RLock: # type: ignore

@@ -4,6 +4,7 @@ import random
 from typing import Callable, Dict, List, Tuple, Any, Union, Optional
 import subprocess
 from pathlib import Path
+import numpy as np
 
 # internal Modules
 from tbot223_core import AppCore
@@ -25,11 +26,13 @@ def helper_methods():
     return HelperMethods()
 
 class HelperMethods:
-    def metrix_task(self, n: int, m: int) -> bool:
+    @staticmethod
+    def metrix_task(n: int, m: int) -> bool:
         """
         A sample task that generates an n x m matrix filled with random floats.
+        Implemented with numpy for performance.
         """
-        [[random.random() for _ in range(m)] for _ in range(n)]
+        np.random.rand(n, m)
         return True
     
     def verify_results(self, results: List[Any], expected_count: int = 500) -> None:
