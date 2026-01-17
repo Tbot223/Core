@@ -1,6 +1,8 @@
 # external Modules
 import pytest
 from pathlib import Path
+import subprocess
+import sys
 
 # internal Modules
 from SRC import AppCore_test, Exception_test, LogSys_test, Utils_test, FileManager_test
@@ -23,7 +25,13 @@ class Test_CoreV2:
         pytest.main([FileManager_test.__file__])
 
     def run_all_tests(self, include_performance=False, duration=False):
-        pytest.main([str(Path(__file__).resolve().parent / "SRC"), "-v", "" if include_performance else "-m not performance", "--durations=10" if duration else ""])
+        test_path = str(Path(__file__).resolve().parent / "SRC")
+        args = [sys.executable, "-m", "pytest", test_path, "-v"] # avoid pytest invocation issues on some systems
+        if not include_performance:
+            args.extend(["-m", "not performance"])
+        if duration:
+            args.extend(["--durations=10"])
+        subprocess.run(args)
 
 if __name__ == "__main__":
     def verify_input(prompt, valid_responses):

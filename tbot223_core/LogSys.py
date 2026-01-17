@@ -34,7 +34,7 @@ class LoggerManager:
         # Initialize base directory for logs
         self._BASE_DIR = Path(base_dir) if base_dir is not None else Path.cwd() / "logs"
         os.makedirs(self._BASE_DIR, exist_ok=True)
-        self.second_log_dir = str(second_log_dir)
+        self.second_log_dir = Path(second_log_dir)
 
         # Record start time for log filenames
         self._started_time = time.strftime("%Y-%m-%d_%Hh-%Mm-%Ss", time.localtime())
@@ -72,7 +72,7 @@ class LoggerManager:
 
             # Create a log file
             log_filename = self._BASE_DIR / self.second_log_dir / f"{time or self._started_time}_log" / f"{logger_name}.log"
-            os.makedirs(os.path.dirname(log_filename), exist_ok=True)
+            os.makedirs(log_filename.parent, exist_ok=True)
 
             # Prevent duplicate handlers
             for handler in logger.handlers[:]:
