@@ -6,7 +6,7 @@ import hashlib, secrets
 import logging
 import struct
 from multiprocessing import RLock, shared_memory, Lock
-import pickle
+import pickle, json
 
 # internal Modules
 from tbot223_core.Result import Result
@@ -60,7 +60,8 @@ class Utils:
             self._logger = logger or self._logger_manager.get_logger("UtilsLogger").data
         self.log = log_instance or LogSys.Log(logger=self._logger)
 
-        self.log.log_message("INFO", "Utils initialized.")
+        if self.__is_logging_enabled__:
+            self.log.log_message("INFO", "Utils initialized.")
 
     # Internal Methods
     def _check_pbkdf2_params(self, password: str, algorithm: str, iterations: int, salt_size: int = 32) -> None:
@@ -119,9 +120,11 @@ class Utils:
                 continue
             if comparison_func(value):
                 found_keys.append(f"{nest_mark}{key}")
-                self.log.log_message("DEBUG", f"Key '{nest_mark}{key}' matches the condition.")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("DEBUG", f"Key '{nest_mark}{key}' matches the condition.")
             if nested and isinstance(value, dict):
-                self.log.log_message("DEBUG", f"Searching nested dictionary at key '{key}'.")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("DEBUG", f"Searching nested dictionary at key '{key}'.")
                 found_keys.extend(self._lookup_dict(value, threshold, comparison_func, comparison_type, nested, f"{nest_mark}{key}."))
         return found_keys
 
@@ -146,7 +149,7 @@ class Utils:
         """
         try:
             if not isinstance(path_str, str):
-                return Result(True, "already a Path object", None, path_str)
+                return Result(True, None, None, path_str)
 
             return Result(True, None, None, Path(path_str))
         except Exception as e:
@@ -182,10 +185,12 @@ class Utils:
             hash_func.update(data.encode('utf-8'))
             encrypted_data = hash_func.hexdigest()
 
-            self.log.log_message("INFO", f"Data encrypted using {algorithm}.")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Data encrypted using {algorithm}.")
             return Result(True, None, None, encrypted_data)
         except Exception as e:
-            self.log.log_message("ERROR", f"Encryption failed: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Encryption failed: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def pbkdf2_hmac(self, password: str, algorithm: str, iterations: int, salt_size: int) -> Result:
@@ -227,10 +232,12 @@ class Utils:
                 "algorithm": algorithm
             }
 
-            self.log.log_message("INFO", f"PBKDF2 HMAC hash generated using {algorithm} with {iterations} iterations.")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"PBKDF2 HMAC hash generated using {algorithm} with {iterations} iterations.")
             return Result(True, None, None, result)
         except Exception as e:
-            self.log.log_message("ERROR", f"PBKDF2 HMAC hash generation failed: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"PBKDF2 HMAC hash generation failed: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def verify_pbkdf2_hmac(self, password: str, salt_hex: str, hash_hex: str, iterations: int, algorithm: str) -> Result:
@@ -274,10 +281,12 @@ class Utils:
             computed_hash_hex = hash_bytes.hex()
 
             is_valid = computed_hash_hex == hash_hex
-            self.log.log_message("INFO", f"PBKDF2 HMAC hash verification using {algorithm} with {iterations} iterations. Result: {is_valid}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"PBKDF2 HMAC hash verification using {algorithm} with {iterations} iterations. Result: {is_valid}")
             return Result(True, None, None, is_valid)
         except Exception as e:
-            self.log.log_message("ERROR", f"PBKDF2 HMAC hash verification failed: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"PBKDF2 HMAC hash verification failed: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def insert_at_intervals(self, data: Union[List, str], interval: int, insert: Any, at_start: bool=True) -> Result:
@@ -315,13 +324,23 @@ class Utils:
                 original_type_is_str = True
                 data = list(data)
 
-            at_start = 0 if at_start else interval
-            for i in range(at_start, len(data)+at_start, interval+1):
-                data[i:i] = [insert]
+            # Build new list by inserting at intervals (iterate in reverse to avoid index shifting issues)
+            result_data = list(data)
+            start_index = 0 if at_start else interval
+            insert_count = 0
+            
+            # Calculate positions from the end to maintain correct indices
+            positions_to_insert = list(range(start_index, len(result_data) + insert_count * (interval + 1), interval + 1))
+            
+            # Insert in reverse order to avoid index shifting
+            for pos in reversed(positions_to_insert):
+                if pos <= len(result_data):
+                    result_data.insert(pos, insert)
+                    insert_count += 1
 
             if original_type_is_str:
-                data = ''.join(map(str, data))
-            return Result(True, None, None, data)
+                result_data = ''.join(map(str, result_data))
+            return Result(True, None, None, result_data)
         except Exception as e:
             return self._exception_tracker.get_exception_return(e)
     
@@ -373,10 +392,12 @@ class Utils:
             comparison_func = comparison_operators[comparison]
             found_keys = self._lookup_dict(dict_obj, threshold, comparison_func, comparison, nested)
 
-            self.log.log_message("INFO", f"find_keys_by_value found {len(found_keys)} keys matching criteria.")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"find_keys_by_value found {len(found_keys)} keys matching criteria.")
             return Result(True, None, None, found_keys)
         except Exception as e:
-            self.log.log_message("ERROR", f"Error in find_keys_by_value: {str(e)}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Error in find_keys_by_value: {str(e)}")
             return self._exception_tracker.get_exception_return(e)
         
 class DecoratorUtils:
@@ -410,6 +431,33 @@ class DecoratorUtils:
                 return result
             return wrapper
         return decorator
+    
+    def make_decorator(self, func):
+        """
+        Decorator to handle exceptions and return a Result object.
+        
+        Args:
+            - func : The function to decorate.
+            
+        Returns:
+            A wrapper function that returns a Result object on exception.
+            
+        Example:
+            >>> def my_function(x):
+            >>>     return 10 / x
+            >>> decorated_function = DecoratorUtils().make_decorator(my_function)
+            >>> @decorated_function
+            >>> def safe_function(x):
+            >>>     return 10 / x
+            >>> result = safe_function(0)
+
+        """
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                return self._exception_tracker.get_exception_return(e)
+        return wrapper
     
 class GlobalVars:
     """
@@ -498,8 +546,22 @@ class GlobalVars:
 
         >>> globals("api_key", "12345", overwrite=True)
         >>> print(globals("api_key").data)  # Output: 12345
-    """
     
+    Security:
+    - The shared-memory methods ('shm_sync', 'shm_update', etc.) support two 
+        serialization formats: 'pickle' (default) and 'json'.
+    - PICKLE: Unpickling untrusted data can execute arbitrary code. Use pickle 
+        serialization only between trusted processes.
+    - JSON: Safe for untrusted processes but has limitations (cannot serialize 
+        all Python objects like custom classes, functions, etc.).
+    - To use JSON serialization for safer inter-process communication:
+        >>> gv.shm_sync("my_shm", serialize_format="json")
+        >>> gv.shm_update("my_shm", serialize_format="json")
+    - Always validate and verify data integrity when using shared memory with
+        untrusted processes, regardless of serialization format.
+
+    """
+
     def __init__(self, is_logging_enabled: bool=False, base_dir: Union[str, Path]=None,
                  shared_memory_cache_max_size: int=5,
                  logger_manager_instance: Optional[LogSys.LoggerManager]=None, logger: Optional[logging.Logger]=None, 
@@ -530,6 +592,17 @@ class GlobalVars:
         self.__shm_name__ = set()
         self.__shm_cache__ = {}
         self.__shm_cache_max_size__ = shared_memory_cache_max_size
+
+        self.SERIALIZERS = {
+            "pickle": (
+                    lambda obj: pickle.dumps(obj), 
+                    lambda byte_data: pickle.loads(byte_data)
+            ),
+            "json": (
+                    lambda obj: json.dumps(obj).encode('utf-8'), 
+                    lambda byte_data: json.loads(byte_data.decode('utf-8'))
+            )
+        }
 
         # Initialization complete
         object.__setattr__(self, '__initializing__', False)
@@ -818,6 +891,10 @@ class GlobalVars:
         """
         Internal method to manage shared memory cache.
 
+        Security: This method manages shared memory cache; shared-memory data
+        may be serialized by other methods using pickle or json format.
+        Use json format (serialize_format="json") for untrusted processes.
+
         Args:
             - name: The name of the shared memory object.
             - shm: The shared memory object.
@@ -881,6 +958,10 @@ class GlobalVars:
         Generate a shared memory object for inter-process communication.
         Recommended to use a Lock for safe access across processes.
 
+        Security: The shared memory object may be used to store data serialized
+        with pickle (default) or json. For untrusted processes, use json format:
+        >>> gv.shm_sync("name", serialize_format="json")
+
         Args:
             - name: The name of the shared memory object.
             - size: The size of the shared memory object in bytes.
@@ -936,6 +1017,9 @@ class GlobalVars:
         Unlike shm_gen, this method only connects to existing shared memory
         and does not create new one or Lock.
 
+        Security: Connected shared memory may contain pickle or json serialized data.
+        Ensure you use the same serialization format when calling shm_sync/shm_update.
+
         Args:
             - name: The name of the existing shared memory object.
 
@@ -980,6 +1064,9 @@ class GlobalVars:
         """
         Get an existing shared memory object by name.
 
+        Security: Retrieved shared memory may contain pickle or json serialized data.
+        Use json format for safer inter-process communication with untrusted sources.
+
         Args:
             - name: The name of the shared memory object.
 
@@ -1010,12 +1097,18 @@ class GlobalVars:
                 self.log.log_message("ERROR", f"Failed to retrieve shared memory object '{name}' from cache: {e}")
             return self._exception_tracker.get_exception_return(e)
         
-    def shm_sync(self, name: str) -> Result:
+    def shm_sync(self, name: str, serialize_format: str="pickle") -> Result:
         """
         Synchronize the current object's variables to the shared memory object.
 
+        Security: This method supports 'pickle' (default) and 'json' serialization.
+        - pickle: Fast but dangerous with untrusted data (arbitrary code execution)
+        - json: Safe but limited (cannot serialize custom classes, functions, etc.)
+        For untrusted processes, always use serialize_format="json".
+
         Args:
             - name: The name of the shared memory object.
+            - serialize_format: The serialization format to use. Default is "pickle". ("pickle" or "json")
 
         Returns:
             Result: A Result object indicating success or failure.
@@ -1030,7 +1123,11 @@ class GlobalVars:
             >>> print(gv.some_variable)  # Output: 42
         """
         try:
-            byte_dict = pickle.dumps(self.__vars__)
+            if serialize_format not in self.SERIALIZERS:
+                raise ValueError(f"Unsupported serialization format: {serialize_format}")
+            
+            byte_dict = self.SERIALIZERS[serialize_format][0](self.__vars__)
+                
             data_len = len(byte_dict)
             header_size = 8 # bytes to store length of data
 
@@ -1043,7 +1140,7 @@ class GlobalVars:
                 shm = self.__shm_cache__[name]
 
             if data_len + header_size > shm.size:
-                raise ValueError(f"Serialized object size exceeds shared memory size. Required: {data_len + header_size}, Available: {shm.size}")
+                raise MemoryError(f"Serialized data size ({data_len + header_size} bytes) exceeds shared memory size ({shm.size} bytes).")
             
             shm.buf[:header_size] = struct.pack('Q', data_len)
             shm.buf[header_size:header_size+data_len] = byte_dict
@@ -1056,12 +1153,18 @@ class GlobalVars:
                 self.log.log_message("ERROR", f"Failed to synchronize shared memory object '{name}': {e}")
             return self._exception_tracker.get_exception_return(e)
         
-    def shm_update(self, name: str) -> Result:
+    def shm_update(self, name: str, serialize_format: str="pickle") -> Result:
         """
         Update the current object's variables from the shared memory object.
+
+        Security: This method supports 'pickle' and 'json' deserialization.
+        - pickle: Dangerous with untrusted data (can execute arbitrary code)
+        - json: Safe for untrusted data but has serialization limitations
+        Always use the same format that was used in shm_sync().
         
         Args:
             - name: The name of the shared memory object.
+            - serialize_format: The serialization format to use. Default is "pickle". ("pickle" or "json")
 
         Returns:
             Result: A Result object indicating success or failure.
@@ -1072,10 +1175,13 @@ class GlobalVars:
             >>> gv.some_variable = 42
             >>> gv.shm_sync("my_shm")
             >>> # In another process:
-            >>> gv.shm_update("my_shm")
+            >>> gv.shm_update("my_shm", serialize_format="pickle")
             >>> print(gv.some_variable)  # Output: 42
         """
         try:
+            if serialize_format not in self.SERIALIZERS:
+                raise ValueError(f"Unsupported serialization format: {serialize_format}")
+            
             shm = self.shm_get(name).data
             header_size = 8 # bytes to store length of data
 
@@ -1090,7 +1196,7 @@ class GlobalVars:
             byte_dict = bytes(shm.buf[header_size:header_size+data_len])
 
             try:
-                obj_dict = pickle.loads(byte_dict)
+                obj_dict = self.SERIALIZERS[serialize_format][1](byte_dict)
             except Exception as e:
                 raise ValueError(f"Unpickling error. Read {data_len} bytes from shared memory but failed to unpickle: {e}")
 

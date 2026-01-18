@@ -67,15 +67,17 @@ Thread-safe global variable management with shared memory support:
 - Call syntax for get/set operations (`gv("key", value)`)
 - Shared memory creation (`shm_gen()`) with optional `multiprocessing.Lock`
 - Shared memory connection for child processes (`shm_connect()`)
-- Shared memory synchronization (`shm_sync()`, `shm_update()`)
+- Shared memory synchronization (`shm_sync()`, `shm_update()`) with pickle/json serialization
 - Shared memory access with LRU cache (`shm_get()`, `shm_cache_management()`)
 - Shared memory cleanup (`shm_close()`) with optional `close_only` mode
 - Context manager support (`with gv:`) for thread-safe operations
 - Internal thread lock access (`lock()`)
+- **Security**: JSON serialization option for safer IPC with untrusted processes
 
 ### DecoratorUtils
 Utility decorators:
 - Runtime measurement decorator (`runtime()`)
+- Function-to-decorator converter (`make_decorator()`)
 
 ### ExceptionTracker
 Comprehensive error tracking:
