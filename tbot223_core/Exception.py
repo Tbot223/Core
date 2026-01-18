@@ -64,7 +64,8 @@ class ExceptionTracker():
             return Result(True, None, None, f"'{frame.filename}', line {frame.lineno}, in {frame.name}")
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_location, R42-67", traceback.format_exc())
+            tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_location, R42-67", tb_str)
 
     def get_exception_info(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=None, masking: bool=False) -> Result:
         """
@@ -114,13 +115,14 @@ class ExceptionTracker():
                     "user_input": user_input,
                     "params": params
                 },
-                "traceback": traceback.format_exc(),
+                "traceback": ''.join(traceback.format_exception(type(error), error, error.__traceback__)),
                 "computer_info": self._system_info if not masking else "<Masked>"
             }
             return Result(True, None, None, error_info)
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_info, R69-123", traceback.format_exc())
+            tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_info, R69-123", tb_str)
         
     def get_exception_return(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=None, masking: bool=False) -> Result:
         """
@@ -151,7 +153,8 @@ class ExceptionTracker():
             return Result(False, f"{type(error).__name__} :{str(error)}", self.get_exception_location(error).data, self.get_exception_info(error, user_input, params).data if not masking else "<Masked>")
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, R125-155", traceback.format_exc())
+            tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, R125-155", tb_str)
         
 class ExceptionTrackerDecorator():
     """

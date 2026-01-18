@@ -55,6 +55,9 @@ class FileManager:
         - create_directory(dir_path) -> Result:
             Create a directory.
     """
+    
+    # File locking threshold: files larger than this size will be locked during read operations
+    LOCK_FILE_SIZE_THRESHOLD = 10 * 1024 * 1024  # 10 MB
 
     def __init__(self, is_logging_enabled: bool=True, is_debug_enabled: bool=False,
                  base_dir: Union[str, Path]=None,
@@ -79,7 +82,8 @@ class FileManager:
         self.log = log_instance or LogSys.Log(logger=self.logger)
         self._utils = Utils_instance or Utils.Utils()
 
-        self.log.log_message("INFO", "FileManager initialized.")
+        if self.__is_logging_enabled__:
+            self.log.log_message("INFO", "FileManager initialized.")
 
     # internal Methods
     @staticmethod
@@ -204,16 +208,20 @@ class FileManager:
                 temp.close()
                 replace_temp_with_target(temp_path, file_path)
 
-            self.log.log_message("INFO", f"Successfully wrote to {file_path}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Successfully wrote to {file_path}")
             return Result(True, None, None, f"Successfully wrote to {file_path}")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to write to {file_path}: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to write to {file_path}: {e}")
             try:
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
-                    self.log.log_message("INFO", f"Temporary file {temp_path} deleted.")
+                    if self.__is_logging_enabled__:
+                        self.log.log_message("INFO", f"Temporary file {temp_path} deleted.")
             except Exception as ex:
-                self.log.log_message("ERROR", f"Failed to delete temporary file {temp_path}: {ex}")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("ERROR", f"Failed to delete temporary file {temp_path}: {ex}")
             return self._exception_tracker.get_exception_return(e)
         
     def read_file(self, file_path: Union[str, Path], as_bytes: bool=False) -> Result:
@@ -243,7 +251,7 @@ class FileManager:
 
             mode = 'rb' if as_bytes else 'r'
             encoding = None if as_bytes else 'utf-8'
-            LOCK = (os.path.getsize(file_path) > 1024 * 1024 * 10)  # Lock files larger than 10MB
+            LOCK = (os.path.getsize(file_path) > self.LOCK_FILE_SIZE_THRESHOLD)
 
             def safe_read(f, lock):
                 if lock:
@@ -258,10 +266,12 @@ class FileManager:
             with open(file_path, mode, encoding=encoding) as f:
                 content = safe_read(f, LOCK)
 
-            self.log.log_message("INFO", f"Successfully read from {file_path}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Successfully read from {file_path}")
             return Result(True, None, None, content)
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to read from {file_path}: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to read from {file_path}: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def write_json(self, file_path: Union[str, Path], data: Any, indent: int=4) -> Result:
@@ -294,10 +304,12 @@ class FileManager:
             if not write_result.success:
                 return write_result
             
-            self.log.log_message("INFO", f"Successfully wrote JSON to {file_path}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Successfully wrote JSON to {file_path}")
             return Result(True, None, None, f"Successfully wrote JSON to {file_path}")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to write JSON to {file_path}: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to write JSON to {file_path}: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def read_json(self, file_path: Union[str, Path]) -> Result:
@@ -330,10 +342,12 @@ class FileManager:
             if not read_result.success:
                 return read_result
             
-            self.log.log_message("INFO", f"Successfully read JSON from {file_path}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Successfully read JSON from {file_path}")
             return Result(True, None, None, json.loads(read_result.data))
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to read JSON from {file_path}: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to read JSON from {file_path}: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def list_of_files(self, dir_path: Union[str, Path], extensions: List[str]=None, only_name: bool = False) -> Result:
@@ -376,10 +390,12 @@ class FileManager:
                     continue
                 is_matching_file(item, files)
 
-            self.log.log_message("INFO", f"Successfully listed files in {dir_path}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Successfully listed files in {dir_path}")
             return Result(True, None, None, files)
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to list files in {dir_path}: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to list files in {dir_path}: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def exist(self, path: Union[str, Path]) -> Result:
@@ -406,10 +422,12 @@ class FileManager:
             path = self._str_to_path(path)
             exists = path.exists()
 
-            self.log.log_message("INFO", f"Existence check for {path}: {exists}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Existence check for {path}: {exists}")
             return Result(True, None, None, exists)
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to check existence for {path}: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to check existence for {path}: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def delete_file(self, file_path: Union[str, Path]) -> Result:
@@ -438,14 +456,17 @@ class FileManager:
             try:
                 file_path.unlink()
             except PermissionError:
-                self.log.log_message("ERROR", f"Permission denied when deleting {file_path}, attempting to change permissions and retry.")  
+                if self.__is_logging_enabled__:
+                    self.log.log_message("ERROR", f"Permission denied when deleting {file_path}, attempting to change permissions and retry.")  
                 os.chmod(file_path, stat.S_IWRITE)
                 file_path.unlink()
                 
-            self.log.log_message("INFO", f"Successfully deleted {file_path}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Successfully deleted {file_path}")
             return Result(True, None, None, f"Successfully deleted {file_path}")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to delete {file_path}: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to delete {file_path}: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def delete_directory(self, dir_path: Union[str, Path]) -> Result:
@@ -477,13 +498,16 @@ class FileManager:
             try:
                 shutil.rmtree(dir_path)
             except PermissionError:
-                self.log.log_message("ERROR", f"Permission denied when deleting {dir_path}, attempting to change permissions and retry.")
+                if self.__is_logging_enabled__:
+                    self.log.log_message("ERROR", f"Permission denied when deleting {dir_path}, attempting to change permissions and retry.")
                 shutil.rmtree(dir_path, onexc=self._handle_exc)
 
-            self.log.log_message("INFO", f"Successfully deleted directory {dir_path}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Successfully deleted directory {dir_path}")
             return Result(True, None, None, f"Successfully deleted directory {dir_path}")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to delete directory {dir_path}: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to delete directory {dir_path}: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     def create_directory(self, dir_path: Union[str, Path]) -> Result:
@@ -509,10 +533,12 @@ class FileManager:
             dir_path = self._str_to_path(dir_path)
             dir_path.mkdir(parents=True, exist_ok=True)
 
-            self.log.log_message("INFO", f"Successfully created directory {dir_path}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("INFO", f"Successfully created directory {dir_path}")
             return Result(True, None, None, f"Successfully created directory {dir_path}")
         except Exception as e:
-            self.log.log_message("ERROR", f"Failed to create directory {dir_path}: {e}")
+            if self.__is_logging_enabled__:
+                self.log.log_message("ERROR", f"Failed to create directory {dir_path}: {e}")
             return self._exception_tracker.get_exception_return(e)
         
     # __enter__ and __exit__
