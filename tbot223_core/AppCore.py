@@ -234,9 +234,9 @@ class AppCore:
         Execute functions in parallel using ThreadPoolExecutor.
 
         Args:
-            data : 
-            workers : Number of worker threads to use. Defaults to os.cpu_count() * 2.
-            override : If True, allows workers to exceed the number of tasks.
+            data : List of tuples, Each containing a function and a dictionary of arguments. Example: [(func1, {'arg1': val1}), (func2, {'arg2': val2})]
+            workers : Number of worker threads to use. Defaults to os.cpu_count().
+            override : If True, allows workers to exceed the number of tasks. also limits is unlocked.
             timeout : Maximum time to wait for each function to complete. ( 0.1 seconds minimum )
 
         Returns:
@@ -254,7 +254,7 @@ class AppCore:
                 if self.__is_logging_enabled__:
                     self.log.log_message("ERROR", f"Thread pool executor validation failed: {error_message}")
                 return Result(False, error_message, None, None)
-            workers = min(workers or os.cpu_count() * 2, os.cpu_count() * 2)
+            workers = min(workers or os.cpu_count(), os.cpu_count()) if override else workers
             results = self._generic_executor(data, workers, timeout, type='thread')
 
             if self.__is_logging_enabled__:
@@ -271,9 +271,10 @@ class AppCore:
 
         Args:
             data : List of tuples, Each containing a function and a dictionary of arguments. Example: [(func1, {'arg1': val1}), (func2, {'arg2': val2})]
-            workers : Number of worker processes to use. Defaults to os.cpu_count() * 2.
-            override : If True, allows workers to exceed the number of tasks.
+            workers : Number of worker processes to use. Defaults to os.cpu_count().
+            override : If True, allows workers to exceed the number of tasks. also limits is unlocked.
             timeout : Maximum time to wait for each function to complete. ( 0.1 seconds minimum )
+            chunk_size : Number of tasks to submit at once to each worker process. If None, it will be calculated based on the number of workers and total tasks.
 
         Returns:
             indexed list of Result objects corresponding to each function execution.
@@ -290,7 +291,7 @@ class AppCore:
                 if self.__is_logging_enabled__:
                     self.log.log_message("ERROR", f"Process pool executor validation failed: {error_message}")
                 return Result(False, error_message, None, None)
-            workers = min(workers or os.cpu_count() * 2, os.cpu_count() * 2)
+            workers = min(workers or os.cpu_count(), os.cpu_count()) if override else workers
             computed_chunk = chunk_size if chunk_size is not None else max(1, int(math.ceil(len(data) / workers)))
             chunks = list(self._chunk_list(data, computed_chunk))
             results = []
@@ -384,6 +385,7 @@ class AppCore:
 
         Args:
             code : Exit code to return to the operating system. Default is 0.
+            pause : If True, waits for user input before exiting. Default is False.
 
         Returns:
             returns only on failure with a Result object indicating the error.
@@ -405,6 +407,9 @@ class AppCore:
     def restart_application(self, pause: bool=False) -> Result:
         """
         Restart the current application.
+
+        Args:
+            pause : If True, waits for user input before restarting. Default is False.
 
         Returns:
             returns only on failure with a Result object indicating the error.

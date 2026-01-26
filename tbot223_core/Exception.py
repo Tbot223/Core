@@ -113,7 +113,10 @@ class ExceptionTracker():
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
                 "input_context": {
                     "user_input": user_input,
-                    "params": params
+                    "params": {
+                        "args": params[0] if params else (),
+                        "kwargs": params[1] if params else {}
+                    }
                 },
                 "traceback": ''.join(traceback.format_exception(type(error), error, error.__traceback__)),
                 "computer_info": self._system_info if not masking else "<Masked>"
@@ -164,6 +167,14 @@ class ExceptionTrackerDecorator():
     - Use only for non-critical functions (adds overhead).
     - Not suitable if logging or side effects are required. 
     
+    Args:
+        - masking (bool, optional): If True, exception information will be masked. Defaults to False.
+        - tracker (ExceptionTracker, optional): An instance of ExceptionTracker to use. If None, a new instance will be created. Defaults to None.
+
+    Returns:
+        If no exception occurs, returns the original function's return value.
+        If an exception occurs, returns a Result object with exception details.
+    
     Example:
         >>> tracker = ExceptionTracker()
         >>> @ExceptionTrackerDecorator(masking=True, tracker=tracker)
@@ -185,4 +196,3 @@ class ExceptionTrackerDecorator():
             except Exception as e:
                 return self.tracker.get_exception_return(error=e, params=(args, kwargs), masking=self.masking)
         return wrapper
-    

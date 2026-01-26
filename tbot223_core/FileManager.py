@@ -234,7 +234,7 @@ class FileManager:
 
         Args:
             - file_path : The path to the file to read.
-            - as_bytes (bool, optional): If True, read the file in binary mode.
+            - as_bytes : If True, read the file in binary mode.
             
         Returns:
             Result: A Result object containing the file content in the data field.
