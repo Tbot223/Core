@@ -1,6 +1,6 @@
 # external Modules
 from pathlib import Path
-from typing import Optional, Union, List, Any, Dict, Callable
+from typing import Optional, Union, List, Any, Dict, Callable, Tuple
 import time
 import hashlib, secrets
 import logging
@@ -92,7 +92,7 @@ class Utils:
         if not isinstance(salt_size, int) or salt_size <= 0:
             raise ValueError("salt_size must be a positive integer")
         
-    def _lookup_dict(self, dict_obj: Dict, threshold: Union[int, float, str, bool], comparison_func: Callable, comparison_type: str, nested: bool, nest_mark: str = "") -> List:
+    def _lookup_dict(self, dict_obj: Dict, threshold: Union[int, float, str, bool], comparison_func: Callable, comparison_type: str, nested: bool = False, separator: str = "/" , return_mod: str = "flat", prefix_marker: str = "") -> Union[List[Union[str, Dict]], Tuple[Union[str, Dict], ...]]:
         """
         Helper method to recursively look up keys in a dictionary based on a comparison function.
 
@@ -102,6 +102,12 @@ class Utils:
             comparison_func : A callable that takes a value and returns True if it meets the condition.
             comparison_type : The type of comparison being performed.
             nested : If True, search within nested dictionaries.
+            separator : A string to prefix nested keys with. Defaults to "/". (If "tuple", returns tuple, if "list", returns list)
+            return_mod : The mode of return format.
+                - "flat": Return a list of keys only. If nested, don't include parent keys. DO NOT USE FOR NESTED KEYS.
+                - "forest": Return a list of dicts with key-value pairs.
+                - "path": Returns a list of full paths with separators
+            prefix_marker : DO NOT USE, for internal use only to mark nested keys.
 
         Returns:
             A list of keys that meet the comparison criteria.
@@ -114,19 +120,35 @@ class Utils:
         """
         found_keys = []
         for key, value in dict_obj.items():
-            if isinstance(value, (str, bool)) != isinstance(threshold, (str, bool)) and comparison_type in ['eq', 'ne']:
-                continue
             if isinstance(value, (tuple, list)):
-                continue
-            if comparison_func(value):
-                found_keys.append(f"{nest_mark}{key}")
                 if self.__is_logging_enabled__:
-                    self.log.log_message("DEBUG", f"Key '{nest_mark}{key}' matches the condition.")
+                    self.log.log_message("DEBUG", f"Skipping iterable at key '{key}'.")
+                continue
             if nested and isinstance(value, dict):
                 if self.__is_logging_enabled__:
                     self.log.log_message("DEBUG", f"Searching nested dictionary at key '{key}'.")
-                found_keys.extend(self._lookup_dict(value, threshold, comparison_func, comparison_type, nested, f"{nest_mark}{key}."))
-        return found_keys
+                if return_mod == "flat":
+                    found_keys.append(self._lookup_dict(value, threshold, comparison_func, comparison_type, nested, separator, "flat"))
+                elif return_mod == "forest":
+                    found_keys.append({key: self._lookup_dict(value, threshold, comparison_func, comparison_type, nested, separator, "forest")})
+                elif return_mod == "path":
+                    found_keys.extend(self._lookup_dict(value, threshold, comparison_func, comparison_type, nested, separator, "path", f"{prefix_marker}{key}{separator}"))
+            elif type(value) != type(threshold) and comparison_type in ('eq', 'ne'):
+                if self.__is_logging_enabled__:
+                    self.log.log_message("DEBUG", f"Type mismatch at key '{key}': {type(value).__name__} vs {type(threshold).__name__}. Skipping.")
+                continue
+            else:
+                if comparison_func(value):
+                    if return_mod == "flat":
+                        found_keys.append(key)
+                    elif return_mod == "forest":
+                        found_keys.extend({key: value})
+                    elif return_mod == "path":
+                        found_keys.append(f"{prefix_marker}{key}")
+
+                    if self.__is_logging_enabled__:
+                        self.log.log_message("DEBUG", f"Key '{prefix_marker}{key}' matches the condition.")
+        return tuple(found_keys) if separator == "tuple" else found_keys
 
     # external Methods
     def str_to_path(self, path_str: str) -> Path:
@@ -344,7 +366,7 @@ class Utils:
         except Exception as e:
             return self._exception_tracker.get_exception_return(e)
     
-    def find_keys_by_value(self, dict_obj: Dict, threshold: Union[int, float, str, bool],  comparison: str='eq', nested: bool=False) -> Result:
+    def find_keys_by_value(self, dict_obj: Dict, threshold: Union[int, float, str, bool],  comparison: str='eq', nested: bool=False, separator: str = "/", return_mod: str = "flat") -> Result:
         """
         Find keys in dict_obj where their values meet the threshold based on the comparison operator.
 
@@ -355,6 +377,11 @@ class Utils:
             threshold : The value to compare against.
             comparison : The comparison operator as a string. Default is 'eq' (equal).
             nested : If True, search within nested dictionaries.
+            separator : The string to prepend to keys for nested dictionaries (default: "/"). ( If "tuple", returns tuple, if "list", returns list )
+            return_mod : The mode of return format.
+                - "flat": Return a list of keys only.
+                - "forest": Return a list of dicts with key-value pairs.
+                - "path": Returns a list of full paths with separators
 
         Returns:
             A list of keys that meet the comparison criteria.
@@ -388,9 +415,17 @@ class Utils:
                 raise ValueError("Input data must be a dictionary")
             if isinstance(threshold, (str, bool, int, float)) is False:
                 raise ValueError("Threshold must be of type str, bool, int, or float")
+            if not isinstance(nested, bool):
+                raise ValueError("nested must be a boolean value")
+            if not isinstance(separator, str):
+                raise ValueError("separator must be a string")
+            if return_mod not in ("flat", "forest", "path"):
+                raise ValueError("return_mod must be one of 'flat', 'forest', or 'path'")
+            if return_mod == "path" and separator in ("list", "tuple"):
+                raise ValueError("separator cannot be 'list' or 'tuple' when return_mod is 'path'")
             
             comparison_func = comparison_operators[comparison]
-            found_keys = self._lookup_dict(dict_obj, threshold, comparison_func, comparison, nested)
+            found_keys = self._lookup_dict(dict_obj, threshold, comparison_func, comparison, nested, separator=separator, return_mod=return_mod)
 
             if self.__is_logging_enabled__:
                 self.log.log_message("INFO", f"find_keys_by_value found {len(found_keys)} keys matching criteria.")

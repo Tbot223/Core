@@ -162,7 +162,110 @@ class TestFileManagerEdgeCases:
 
             result = file_manager.atomic_write(file_path=target_file, data="New data that won't be written.")
             assert not result.success, "Atomic write unexpectedly succeeded despite replace failure."
-            assert target_file.read_text() == original_data, "Original data was altered despite atomic write failure." 
+            assert target_file.read_text() == original_data, "Original data was altered despite atomic write failure."
+
+    def test_create_directory(self, file_manager, tmp_path):
+        """Test creating a directory"""
+        new_dir = tmp_path / "new_test_directory"
+        
+        result = file_manager.create_directory(dir_path=new_dir)
+        assert result.success, f"Create directory failed: {result.error}"
+        assert new_dir.exists() and new_dir.is_dir(), "Directory was not created"
+    
+    def test_create_nested_directory(self, file_manager, tmp_path):
+        """Test creating nested directories"""
+        nested_dir = tmp_path / "level1" / "level2" / "level3"
+        
+        result = file_manager.create_directory(dir_path=nested_dir)
+        assert result.success, f"Create nested directory failed: {result.error}"
+        assert nested_dir.exists() and nested_dir.is_dir(), "Nested directory was not created"
+    
+    def test_exist_method(self, file_manager, tmp_path):
+        """Test the exist method"""
+        # Test with existing file
+        existing_file = tmp_path / "existing.txt"
+        existing_file.write_text("test")
+        
+        result = file_manager.exist(path=existing_file)
+        assert result.success, f"Exist check failed: {result.error}"
+        assert result.data is True, "Exist should return True for existing file"
+        
+        # Test with non-existing file
+        non_existing = tmp_path / "non_existing.txt"
+        result = file_manager.exist(path=non_existing)
+        assert result.success, f"Exist check failed: {result.error}"
+        assert result.data is False, "Exist should return False for non-existing file"
+    
+    def test_read_json_invalid_extension(self, file_manager, tmp_path):
+        """Test reading JSON from non-JSON file"""
+        txt_file = tmp_path / "test.txt"
+        txt_file.write_text('{"key": "value"}')
+        
+        result = file_manager.read_json(file_path=txt_file)
+        assert not result.success, "Reading JSON from .txt should fail"
+    
+    def test_delete_nonexistent_file(self, file_manager, tmp_path):
+        """Test deleting non-existent file"""
+        nonexistent = tmp_path / "does_not_exist.txt"
+        
+        result = file_manager.delete_file(file_path=nonexistent)
+        assert not result.success, "Deleting non-existent file should fail"
+    
+    def test_delete_nonexistent_directory(self, file_manager, tmp_path):
+        """Test deleting non-existent directory"""
+        nonexistent = tmp_path / "does_not_exist_dir"
+        
+        result = file_manager.delete_directory(dir_path=nonexistent)
+        assert not result.success, "Deleting non-existent directory should fail"
+    
+    def test_delete_file_as_directory(self, file_manager, tmp_path):
+        """Test deleting a file using delete_directory"""
+        test_file = tmp_path / "test_file.txt"
+        test_file.write_text("test content")
+        
+        result = file_manager.delete_directory(dir_path=test_file)
+        assert not result.success, "Deleting file as directory should fail"
+    
+    def test_read_file_as_bytes(self, file_manager, tmp_path):
+        """Test reading file as bytes"""
+        test_file = tmp_path / "bytes_test.bin"
+        test_data = b'\x00\x01\x02\x03\x04'
+        test_file.write_bytes(test_data)
+        
+        result = file_manager.read_file(file_path=test_file, as_bytes=True)
+        assert result.success, f"Reading file as bytes failed: {result.error}"
+        assert result.data == test_data, "Byte data mismatch"
+    
+    def test_atomic_write_bytes(self, file_manager, tmp_path):
+        """Test atomic write with bytes data"""
+        test_file = tmp_path / "bytes_write_test.bin"
+        test_data = b'\xff\xfe\xfd\xfc'
+        
+        result = file_manager.atomic_write(file_path=test_file, data=test_data)
+        assert result.success, f"Atomic write bytes failed: {result.error}"
+        assert test_file.read_bytes() == test_data, "Written byte data mismatch"
+    
+    def test_list_of_files_empty_directory(self, file_manager, tmp_path):
+        """Test listing files in empty directory"""
+        empty_dir = tmp_path / "empty_dir"
+        empty_dir.mkdir()
+        
+        result = file_manager.list_of_files(dir_path=empty_dir, extensions=[], only_name=True)
+        assert result.success, f"Listing empty directory failed: {result.error}"
+        assert len(result.data) == 0, "Empty directory should have no files"
+    
+    def test_write_json_with_unicode(self, file_manager, tmp_path):
+        """Test writing JSON with unicode characters"""
+        test_file = tmp_path / "unicode.json"
+        test_data = {"한글": "테스트", "emoji": "🎉", "special": "äöü"}
+        
+        write_result = file_manager.write_json(file_path=test_file, data=test_data)
+        assert write_result.success, f"Write JSON with unicode failed: {write_result.error}"
+        
+        read_result = file_manager.read_json(file_path=test_file)
+        assert read_result.success, f"Read JSON with unicode failed: {read_result.error}"
+        assert read_result.data == test_data, "Unicode data mismatch"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])

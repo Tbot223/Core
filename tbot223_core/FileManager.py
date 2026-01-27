@@ -24,7 +24,7 @@ class FileManager:
     Attributes:
         - is_logging_enabled (bool): Flag to enable or disable logging.
         - is_debug_enabled (bool): Flag to enable or disable debug mode.
-        - base_dir (Union[str, Path]): Base directory for file operations.
+        - base_dir (Union[str, Path]): Base directory for file manager. It is NOT I/O base directory. It is used for logging base directory if logging is enabled.
         - logger_manager_instance (LogSys.LoggerManager): Instance of LoggerManager for logging.
         - logger (Any): Logger instance for logging messages.
         - log_instance (LogSys.Log): Instance of Log for logging messages.
@@ -131,6 +131,8 @@ class FileManager:
         Args:
             - file : The file object to lock.
             - mode : The lock mode (fcntl.LOCK_EX, fcntl.LOCK_SH for Unix; msvcrt.LK_LOCK, msvcrt.LK_RLCK for Windows, 1 is lock, 0 is unlock).
+                UNIX: 1 for LOCK_EX, 0 for LOCK_UN, 2 for LOCK_SH
+                WINDOWS: 1 for LK_LOCK, 0 for LK_UNLCK
 
         Returns:
             This method does not return any value.
@@ -144,6 +146,8 @@ class FileManager:
         if os.name != 'nt':
             if mode == 1:
                 fcntl.flock(file, fcntl.LOCK_EX)
+            elif mode == 2:
+                fcntl.flock(file, fcntl.LOCK_SH)
             else:
                 fcntl.flock(file, fcntl.LOCK_UN)
         else:
@@ -234,7 +238,7 @@ class FileManager:
 
         Args:
             - file_path : The path to the file to read.
-            - as_bytes (bool, optional): If True, read the file in binary mode.
+            - as_bytes : If True, read the file in binary mode.
             
         Returns:
             Result: A Result object containing the file content in the data field.
@@ -500,7 +504,10 @@ class FileManager:
             except PermissionError:
                 if self.__is_logging_enabled__:
                     self.log.log_message("ERROR", f"Permission denied when deleting {dir_path}, attempting to change permissions and retry.")
-                shutil.rmtree(dir_path, onexc=self._handle_exc)
+                try:
+                    shutil.rmtree(dir_path, onexc=self._handle_exc)
+                except:
+                    shutil.rmtree(dir_path, onerror=self._handle_exc)
 
             if self.__is_logging_enabled__:
                 self.log.log_message("INFO", f"Successfully deleted directory {dir_path}")

@@ -29,7 +29,11 @@ Provides core application functionalities:
 - Parallel execution with `ThreadPoolExecutor` / `ProcessPoolExecutor`
 - Console management (`clear_console()`)
 - Application lifecycle control (`restart_application()`, `exit_application()`)
-- Multi-language text retrieval (`get_text_by_lang()`)
+- Multi-language text retrieval (`get_text_by_lang()`) 
+    <details>
+    <summary style="color:#FF7F7F">WARNING</summary>
+    You must configure language files before using this feature. See [Examples.md](https://github.com/Tbot223/Core/blob/main/Examples.md) for setup instructions.
+    </details>
 - Safe CLI input with validation and type conversion
 
 ### FileManager
@@ -59,7 +63,7 @@ Collection of utility functions:
 - List/string manipulation (`insert_at_intervals()`)
 - Dictionary operations (`find_keys_by_value()`) with comparison operators
 
-### GlobalVars
+#### GlobalVars ( in Utils.py )
 Thread-safe global variable management with shared memory support:
 - Variable operations (`set()`, `get()`, `delete()`, `clear()`)
 - Variable existence checking (`exists()`, `list_vars()`)
@@ -74,7 +78,7 @@ Thread-safe global variable management with shared memory support:
 - Internal thread lock access (`lock()`)
 - **Security**: JSON serialization option for safer IPC with untrusted processes
 
-### DecoratorUtils
+#### DecoratorUtils ( in Utils.py )
 Utility decorators:
 - Runtime measurement decorator (`runtime()`)
 - Function-to-decorator converter (`make_decorator()`)

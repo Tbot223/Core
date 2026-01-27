@@ -71,6 +71,84 @@ class TestLogSysEdgeCases:
         result = logger_manager.make_logger(logger_name=logger_name, log_level=invalid_log_level)
         assert not result.success, "Logger creation with invalid log level should have failed."
 
+    def test_log_without_logger(self, setup_module):
+        """Test logging when logger is not initialized"""
+        _, log = setup_module
+        
+        # Create a new Log instance without logger
+        empty_log = LogSys.Log(logger=None)
+        result = empty_log.log_message("INFO", "Test message")
+        assert not result.success, "Logging without logger should fail"
+    
+    def test_log_message_levels(self, setup_module):
+        """Test all log message levels"""
+        logger_manager, _ = setup_module
+        
+        # Create a new logger for this test
+        logger_name = "level_test_logger"
+        logger_manager.make_logger(logger_name=logger_name, log_level="DEBUG")
+        logger = logger_manager.get_logger(logger_name).data
+        log = LogSys.Log(logger=logger)
+        
+        # Test all levels
+        for level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+            result = log.log_message(level, f"Test message for {level}")
+            assert result.success, f"Logging at {level} level should succeed"
+    
+    def test_stop_stream_handlers(self, setup_module):
+        """Test stopping stream handlers"""
+        logger_manager, _ = setup_module
+        
+        logger_name = "stream_test_logger"
+        logger_manager.make_logger(logger_name=logger_name, log_level="DEBUG")
+        
+        # Get the actual logger first
+        logger = logger_manager.get_logger(logger_name).data
+        
+        # Stop stream handlers using the logger object
+        result = logger_manager.stop_stream_handlers(logger)
+        assert result.success, f"Stopping stream handlers failed: {result.error}"
+    
+    def test_stop_stream_handlers_nonexistent(self, setup_module):
+        """Test stopping stream handlers for nonexistent logger"""
+        logger_manager, _ = setup_module
+        
+        # Pass None which should fail
+        result = logger_manager.stop_stream_handlers(None)
+        assert not result.success, "Stopping handlers for None logger should fail"
+
+
+@pytest.mark.usefixtures("setup_module")
+class TestSimpleSetting:
+    """Tests for SimpleSetting class"""
+    
+    def test_simple_setting_initialization(self, tmp_path):
+        """Test SimpleSetting initialization"""
+        setting = LogSys.SimpleSetting(
+            base_dir=tmp_path / "logs",
+            second_log_dir="test",
+            logger_name="simple_logger"
+        )
+        
+        logger_manager, log, logger = setting.get_instance()
+        
+        assert logger_manager is not None, "LoggerManager should be initialized"
+        assert log is not None, "Log should be initialized"
+        assert logger is not None, "Logger should be initialized"
+    
+    def test_simple_setting_logging(self, tmp_path):
+        """Test logging with SimpleSetting"""
+        setting = LogSys.SimpleSetting(
+            base_dir=tmp_path / "logs",
+            second_log_dir="test",
+            logger_name="simple_log_test"
+        )
+        
+        _, log, _ = setting.get_instance()
+        
+        result = log.log_message("INFO", "Test message from SimpleSetting")
+        assert result.success, f"Logging with SimpleSetting failed: {result.error}"
+
     # I WILL ADD MORE EDGE CASE TESTS HERE IN THE FUTURE
 
 if __name__ == "__main__":

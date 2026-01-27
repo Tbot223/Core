@@ -1,0 +1,29 @@
+from pathlib import Path
+from tbot223_core import LogSys
+
+# Define base directory for logs
+BASE_DIR = Path(__file__).parents[2] / ".OtherFiles" / "logs"
+SECOND_LOG_DIR = BASE_DIR / "GetLogger" # Subdirectory for this example
+
+if __name__ == "__main__":
+    # Initialize Logger Manager
+    logger_manager = LogSys.LoggerManager(base_dir=BASE_DIR, second_log_dir=SECOND_LOG_DIR)
+
+    # Create a logger
+    result = logger_manager.make_logger("GetLogger", log_level=LogSys.logging.DEBUG)
+
+    if result.success:
+        print(result.data)  # Logger 'GetLogger' created successfully.
+
+    # Get the created logger (`make_logger` is not returning the logger instance)
+    result = logger_manager.get_logger("GetLogger") 
+
+    # Use the logger
+    if result.success:
+        logger = result.data
+        logger.debug("This is a debug message from GetLogger logger.")
+        logger.info("This is an info message from GetLogger logger.")
+    else:
+        print(f"Failed to get logger: {result.error}")
+
+    print("\n -------------- \n TEST COMPLETE \n -------------- \n")
