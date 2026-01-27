@@ -204,6 +204,48 @@ class TestAppCoreEdgeCases:
         results = test_appcore_initialization.process_pool_executor(tasks, workers=4, override=False, timeout=1)
         helper_methods.verify_results(results.data, expected_count=25)
 
+    def test_get_text_by_lang_unsupported_lang(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test get_text_by_lang with unsupported language falls back to default"""
+        result = test_appcore_initialization.get_text_by_lang("Test Key", "unsupported_lang")
+        assert result.success, f"get_text_by_lang failed: {result.error}"
+        # Should fallback to default language
+    
+    def test_get_text_by_lang_nonexistent_key(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test get_text_by_lang with non-existent key"""
+        result = test_appcore_initialization.get_text_by_lang("NonExistentKey12345", "en")
+        assert not result.success, "Non-existent key should fail"
+    
+    def test_thread_pool_with_exception_task(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test thread pool executor with task that raises exception"""
+        def failing_task(x):
+            raise ValueError(f"Intentional failure with {x}")
+        
+        tasks = [(failing_task, {"x": i}) for i in range(3)]
+        results = test_appcore_initialization.thread_pool_executor(tasks, workers=2, override=True, timeout=5)
+        
+        assert results.success, "thread_pool_executor should succeed even with failing tasks"
+        for res in results.data:
+            assert not res.success, "Individual failing task should have success=False"
+    
+    def test_process_pool_with_exception_task(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test process pool executor with task that raises exception"""
+        def failing_task(x):
+            raise ValueError(f"Intentional failure with {x}")
+        
+        tasks = [(failing_task, {"x": i}) for i in range(3)]
+        results = test_appcore_initialization.process_pool_executor(tasks, workers=2, override=True, timeout=5)
+        
+        assert results.success, "process_pool_executor should succeed even with failing tasks"
+        for res in results.data:
+            assert not res.success, "Individual failing task should have success=False"
+    
+    def test_thread_pool_with_override(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods) -> None:
+        """Test thread pool executor with override=True"""
+        tasks = [(helper_methods.metrix_task, {"n": i+1, "m": i+1}) for i in range(5)]
+        # workers > tasks but override=True so it should work
+        results = test_appcore_initialization.thread_pool_executor(tasks, workers=10, override=True, timeout=5)
+        assert results.success, f"thread_pool_executor with override failed: {results.error}"
+
     # I WILL ADD MORE EDGE CASE TESTS HERE IN THE FUTURE
 
 @pytest.mark.usefixtures("tmp_path", "test_appcore_initialization")
@@ -262,7 +304,298 @@ class TestAppCorePerformance:
         for _ in range(2000):
             result = test_appcore_initialization.get_text_by_lang("Test Key", random.choice(["en", "ko", "de", "fr", "es"]))
             assert result.success is True
+
+
+@pytest.mark.usefixtures("test_appcore_initialization")
+class TestResultClass:
+    """Tests for Result NamedTuple class"""
     
+    def test_result_creation(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test basic Result creation"""
+        from tbot223_core.Result import Result
+        
+        # Success result
+        success_result = Result(True, None, None, "test_data")
+        assert success_result.success is True
+        assert success_result.error is None
+        assert success_result.context is None
+        assert success_result.data == "test_data"
+    
+    def test_result_failure(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test Result with failure state"""
+        from tbot223_core.Result import Result
+        
+        # Failure result
+        fail_result = Result(False, "Error message", "Error context", None)
+        assert fail_result.success is False
+        assert fail_result.error == "Error message"
+        assert fail_result.context == "Error context"
+        assert fail_result.data is None
+    
+    def test_result_immutability(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test Result immutability (NamedTuple)"""
+        from tbot223_core.Result import Result
+        
+        result = Result(True, None, None, "data")
+        
+        # Attempt to modify should raise AttributeError
+        with pytest.raises(AttributeError):
+            result.success = False
+    
+    def test_result_unpacking(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test Result unpacking"""
+        from tbot223_core.Result import Result
+        
+        result = Result(True, "err", "ctx", [1, 2, 3])
+        success, error, context, data = result
+        
+        assert success is True
+        assert error == "err"
+        assert context == "ctx"
+        assert data == [1, 2, 3]
+    
+    def test_result_with_complex_data(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test Result with complex data types"""
+        from tbot223_core.Result import Result
+        
+        complex_data = {
+            "list": [1, 2, 3],
+            "dict": {"nested": "value"},
+            "tuple": (1, 2),
+            "none": None
+        }
+        result = Result(True, None, None, complex_data)
+        
+        assert result.data["list"] == [1, 2, 3]
+        assert result.data["dict"]["nested"] == "value"
+
+
+@pytest.mark.usefixtures("test_appcore_initialization")
+class TestResultWrapper:
+    """Tests for ResultWrapper decorator class"""
+    
+    def test_result_wrapper_success(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test ResultWrapper with successful function"""
+        @AppCore.ResultWrapper()
+        def add_numbers(a, b):
+            return a + b
+        
+        result = add_numbers(5, 10)
+        assert result.success is True
+        assert result.data == 15
+    
+    def test_result_wrapper_exception(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test ResultWrapper with function that raises exception"""
+        @AppCore.ResultWrapper()
+        def divide(a, b):
+            return a / b
+        
+        result = divide(10, 0)
+        assert result.success is False
+        assert "ZeroDivisionError" in result.data["error"]["type"]
+    
+    def test_result_wrapper_returns_result(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test ResultWrapper with function that already returns Result"""
+        from tbot223_core.Result import Result
+        
+        @AppCore.ResultWrapper()
+        def returns_result():
+            return Result(True, None, "context", "already_result")
+        
+        result = returns_result()
+        assert result.success is True
+        assert result.data == "already_result"
+        assert result.context == "context"
+    
+    def test_result_wrapper_with_kwargs(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test ResultWrapper with kwargs"""
+        @AppCore.ResultWrapper()
+        def greet(name, greeting="Hello"):
+            return f"{greeting}, {name}!"
+        
+        result = greet("World", greeting="Hi")
+        assert result.success is True
+        assert result.data == "Hi, World!"
+
+
+class TestSafeCLIInput:
+    """Test cases for safe_CLI_input method"""
+    
+    def test_safe_cli_input_basic_string(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test basic string input"""
+        from unittest.mock import patch
+        
+        with patch('builtins.input', return_value='hello'):
+            result = test_appcore_initialization.safe_CLI_input(prompt="Enter text: ")
+            assert result.success is True
+            assert result.data == 'hello'
+    
+    def test_safe_cli_input_integer_conversion(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test input with integer type conversion"""
+        from unittest.mock import patch
+        
+        with patch('builtins.input', return_value='42'):
+            result = test_appcore_initialization.safe_CLI_input(prompt="Enter number: ", input_type=int)
+            assert result.success is True
+            assert result.data == 42
+            assert isinstance(result.data, int)
+    
+    def test_safe_cli_input_float_conversion(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test input with float type conversion"""
+        from unittest.mock import patch
+        
+        with patch('builtins.input', return_value='3.14'):
+            result = test_appcore_initialization.safe_CLI_input(prompt="Enter float: ", input_type=float)
+            assert result.success is True
+            assert abs(result.data - 3.14) < 0.001
+    
+    def test_safe_cli_input_valid_options(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test input with valid options validation"""
+        from unittest.mock import patch
+        
+        with patch('builtins.input', return_value='yes'):
+            result = test_appcore_initialization.safe_CLI_input(
+                prompt="Enter choice: ",
+                valid_options=['yes', 'no']
+            )
+            assert result.success is True
+            assert result.data == 'yes'
+    
+    def test_safe_cli_input_valid_options_case_insensitive(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test input with valid options - case insensitive"""
+        from unittest.mock import patch
+        
+        with patch('builtins.input', return_value='YES'):
+            result = test_appcore_initialization.safe_CLI_input(
+                prompt="Enter choice: ",
+                valid_options=['yes', 'no'],
+                case_sensitive=False
+            )
+            assert result.success is True
+            assert result.data == 'YES'
+    
+    def test_safe_cli_input_valid_options_case_sensitive(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test input with valid options - case sensitive rejection then valid"""
+        from unittest.mock import patch
+        
+        # First input is 'YES' (wrong case), second is 'yes' (correct)
+        with patch('builtins.input', side_effect=['YES', 'yes']):
+            result = test_appcore_initialization.safe_CLI_input(
+                prompt="Enter choice: ",
+                valid_options=['yes', 'no'],
+                case_sensitive=True
+            )
+            assert result.success is True
+            assert result.data == 'yes'
+    
+    def test_safe_cli_input_invalid_type_conversion_retry(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test retry on invalid type conversion"""
+        from unittest.mock import patch
+        
+        # First input fails conversion, second succeeds
+        with patch('builtins.input', side_effect=['not_a_number', '123']):
+            result = test_appcore_initialization.safe_CLI_input(
+                prompt="Enter number: ",
+                input_type=int
+            )
+            assert result.success is True
+            assert result.data == 123
+    
+    def test_safe_cli_input_max_retries_exceeded(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test max retries exceeded returns failure"""
+        from unittest.mock import patch
+        
+        with patch('builtins.input', return_value='invalid'):
+            result = test_appcore_initialization.safe_CLI_input(
+                prompt="Enter choice: ",
+                valid_options=['yes', 'no'],
+                max_retries=3
+            )
+            assert result.success is False
+            assert "Maximum retry attempts" in result.error
+    
+    def test_safe_cli_input_empty_not_allowed(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test empty input rejected when not allowed"""
+        from unittest.mock import patch
+        
+        with patch('builtins.input', side_effect=['', 'valid']):
+            result = test_appcore_initialization.safe_CLI_input(
+                prompt="Enter text: ",
+                allow_empty=False
+            )
+            assert result.success is True
+            assert result.data == 'valid'
+    
+    def test_safe_cli_input_empty_allowed(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test empty input accepted when allowed"""
+        from unittest.mock import patch
+        
+        with patch('builtins.input', return_value=''):
+            result = test_appcore_initialization.safe_CLI_input(
+                prompt="Enter text: ",
+                allow_empty=True
+            )
+            assert result.success is True
+            assert result.data == ''
+    
+    def test_safe_cli_input_invalid_max_retries(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test invalid max_retries parameter raises error"""
+        result = test_appcore_initialization.safe_CLI_input(
+            prompt="Enter text: ",
+            max_retries=0
+        )
+        assert result.success is False
+        assert "max_retries must be a positive integer" in str(result.data)
+    
+    def test_safe_cli_input_invalid_max_retries_negative(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test negative max_retries parameter raises error"""
+        result = test_appcore_initialization.safe_CLI_input(
+            prompt="Enter text: ",
+            max_retries=-5
+        )
+        assert result.success is False
+        assert "max_retries must be a positive integer" in str(result.data)
+    
+    def test_safe_cli_input_unsupported_type_without_other_type(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test unsupported input_type without other_type flag"""
+        result = test_appcore_initialization.safe_CLI_input(
+            prompt="Enter text: ",
+            input_type=list,
+            other_type=False
+        )
+        assert result.success is False
+        assert "input_type must be one of" in str(result.data)
+    
+    def test_safe_cli_input_custom_type_with_other_type(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test custom input_type with other_type flag enabled"""
+        from unittest.mock import patch
+        
+        # Using a custom callable that converts string to list of chars
+        def to_char_list(s):
+            return list(s)
+        
+        with patch('builtins.input', return_value='abc'):
+            result = test_appcore_initialization.safe_CLI_input(
+                prompt="Enter text: ",
+                input_type=to_char_list,
+                other_type=True
+            )
+            assert result.success is True
+            assert result.data == ['a', 'b', 'c']
+    
+    def test_safe_cli_input_bool_conversion(self, test_appcore_initialization: AppCore.AppCore) -> None:
+        """Test bool type conversion (note: bool('False') is True in Python)"""
+        from unittest.mock import patch
+        
+        with patch('builtins.input', return_value='True'):
+            result = test_appcore_initialization.safe_CLI_input(
+                prompt="Enter bool: ",
+                input_type=bool
+            )
+            assert result.success is True
+            # Python's bool('True') is True, bool('') is False
+            assert result.data is True
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-m not performance"])

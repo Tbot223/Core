@@ -62,10 +62,38 @@ class TestUtils:
         keys = utils.find_keys_by_value(sample_dict, 1, "eq", False).data
         assert set(keys) == {'a', 'c'}
 
-        # Nested dictionary test
+        # Nested dictionary test with return_mod="path" (default separator="/")
         sample_dict_nested = {'a': 1, 'b': {'b1': 2, 'b2': 1}, 'c': 1, 'd': 3}
-        keys_nested = utils.find_keys_by_value(sample_dict_nested, 1, "eq", True).data
-        assert set(keys_nested) == {'a', 'b.b2', 'c'}
+        keys_nested = utils.find_keys_by_value(sample_dict_nested, 1, "eq", True, separator="/", return_mod="path").data
+        assert set(keys_nested) == {'a', 'b/b2', 'c'}
+
+        # Test return_mod="flat" (nested results come as nested lists)
+        keys_flat = utils.find_keys_by_value(sample_dict_nested, 1, "eq", True, return_mod="flat").data
+        # flat mode returns nested lists for nested dicts
+        assert 'a' in keys_flat
+        assert 'c' in keys_flat
+
+        # Test return_mod="forest" (returns dict structure)
+        keys_forest = utils.find_keys_by_value(sample_dict_nested, 1, "eq", True, return_mod="forest").data
+        assert 'a' in keys_forest
+        assert 'c' in keys_forest
+
+        # Test separator="tuple" returns tuple
+        keys_tuple = utils.find_keys_by_value(sample_dict, 1, "eq", False, separator="tuple").data
+        assert isinstance(keys_tuple, tuple)
+        assert set(keys_tuple) == {'a', 'c'}
+
+        # Test separator="list" returns list
+        keys_list = utils.find_keys_by_value(sample_dict, 1, "eq", False, separator="list").data
+        assert isinstance(keys_list, list)
+        assert set(keys_list) == {'a', 'c'}
+
+        # Test different comparison operators
+        gt_keys = utils.find_keys_by_value(sample_dict, 2, "gt", False).data
+        assert set(gt_keys) == {'d'}  # only 'd': 3 is greater than 2
+
+        le_keys = utils.find_keys_by_value(sample_dict, 2, "le", False).data
+        assert set(le_keys) == {'a', 'b', 'c'}  # 1, 2, 1 are <= 2
 
     def test_find_keys_by_value_failure(self, setup_module) -> None:
         utils, _, _ = setup_module
@@ -84,6 +112,26 @@ class TestUtils:
         wrong_threshold_result = utils.find_keys_by_value({'a': 1}, ['not', 'a', 'valid', 'type'], "eq", False)
         assert wrong_threshold_result.success is False
         assert "Threshold must be of type str, bool, int, or float" in wrong_threshold_result.error
+
+        # Test invalid nested parameter
+        wrong_nested_result = utils.find_keys_by_value({'a': 1}, 1, "eq", "not_a_bool")
+        assert wrong_nested_result.success is False
+        assert "nested must be a boolean value" in wrong_nested_result.error
+
+        # Test invalid separator parameter
+        wrong_separator_result = utils.find_keys_by_value({'a': 1}, 1, "eq", False, separator=123)
+        assert wrong_separator_result.success is False
+        assert "separator must be a string" in wrong_separator_result.error
+
+        # Test invalid return_mod parameter
+        wrong_return_mod_result = utils.find_keys_by_value({'a': 1}, 1, "eq", False, return_mod="invalid")
+        assert wrong_return_mod_result.success is False
+        assert "return_mod must be one of 'flat', 'forest', or 'path'" in wrong_return_mod_result.error
+
+        # Test separator="list" or "tuple" with return_mod="path" conflict
+        conflict_result = utils.find_keys_by_value({'a': 1}, 1, "eq", False, separator="tuple", return_mod="path")
+        assert conflict_result.success is False
+        assert "separator cannot be 'list' or 'tuple' when return_mod is 'path'" in conflict_result.error
 
     @pytest.mark.performance
     def test_find_keys_by_value_performance(self, setup_module) -> None:
@@ -348,6 +396,389 @@ class TestEdgeCases:
         assert result.data == iterations, f"Concurrent increment failed: expected {iterations}, got {result.data}"
 
     # I WILL ADD MORE EDGE CASE TESTS HERE IN THE FUTURE
+
+
+@pytest.mark.usefixtures("setup_module")
+class TestSharedMemory:
+    """Tests for GlobalVars Shared Memory (SHM) functionality"""
+    
+    def test_shm_gen_basic(self, setup_module):
+        """Test basic shared memory generation"""
+        _, _, global_vars = setup_module
+        
+        shm_name = "test_shm_basic"
+        size = 1024
+        
+        # Generate shared memory
+        result = global_vars.shm_gen(name=shm_name, size=size, create_lock=False)
+        assert result.success, f"Failed to generate shared memory: {result.error}"
+        
+        # Clean up
+        close_result = global_vars.shm_close(shm_name)
+        assert close_result.success, f"Failed to close shared memory: {close_result.error}"
+    
+    def test_shm_gen_with_lock(self, setup_module):
+        """Test shared memory generation with lock"""
+        _, _, global_vars = setup_module
+        
+        shm_name = "test_shm_lock"
+        size = 1024
+        
+        # Generate shared memory with lock
+        result = global_vars.shm_gen(name=shm_name, size=size, create_lock=True)
+        assert result.success, f"Failed to generate shared memory with lock: {result.error}"
+        assert result.data is not None, "Lock should be returned"
+        
+        # Clean up
+        global_vars.shm_close(shm_name)
+    
+    def test_shm_sync_and_update_pickle(self, setup_module):
+        """Test shared memory sync and update with pickle serialization"""
+        _, _, global_vars = setup_module
+        
+        shm_name = "test_shm_sync_pickle"
+        size = 4096
+        
+        # Clear any existing variables
+        global_vars.clear()
+        
+        # Generate shared memory
+        gen_result = global_vars.shm_gen(name=shm_name, size=size, create_lock=False)
+        assert gen_result.success, f"Failed to generate shared memory: {gen_result.error}"
+        
+        # Set some variables
+        global_vars.set("sync_var1", 42)
+        global_vars.set("sync_var2", "hello")
+        global_vars.set("sync_var3", [1, 2, 3])
+        
+        # Sync to shared memory
+        sync_result = global_vars.shm_sync(shm_name, serialize_format="pickle")
+        assert sync_result.success, f"Failed to sync to shared memory: {sync_result.error}"
+        
+        # Clear variables
+        global_vars.clear()
+        
+        # Verify variables are cleared
+        assert not global_vars.get("sync_var1").success, "Variable should be cleared"
+        
+        # Update from shared memory
+        update_result = global_vars.shm_update(shm_name, serialize_format="pickle")
+        assert update_result.success, f"Failed to update from shared memory: {update_result.error}"
+        
+        # Verify variables are restored
+        assert global_vars.get("sync_var1").data == 42, "sync_var1 should be restored"
+        assert global_vars.get("sync_var2").data == "hello", "sync_var2 should be restored"
+        assert global_vars.get("sync_var3").data == [1, 2, 3], "sync_var3 should be restored"
+        
+        # Clean up
+        global_vars.shm_close(shm_name)
+        global_vars.clear()
+    
+    def test_shm_sync_and_update_json(self, setup_module):
+        """Test shared memory sync and update with JSON serialization"""
+        _, _, global_vars = setup_module
+        
+        shm_name = "test_shm_sync_json"
+        size = 4096
+        
+        # Clear any existing variables
+        global_vars.clear()
+        
+        # Generate shared memory
+        gen_result = global_vars.shm_gen(name=shm_name, size=size, create_lock=False)
+        assert gen_result.success, f"Failed to generate shared memory: {gen_result.error}"
+        
+        # Set some JSON-serializable variables
+        global_vars.set("json_var1", 100)
+        global_vars.set("json_var2", "world")
+        global_vars.set("json_var3", {"key": "value"})
+        
+        # Sync to shared memory with JSON
+        sync_result = global_vars.shm_sync(shm_name, serialize_format="json")
+        assert sync_result.success, f"Failed to sync to shared memory with JSON: {sync_result.error}"
+        
+        # Clear variables
+        global_vars.clear()
+        
+        # Update from shared memory with JSON
+        update_result = global_vars.shm_update(shm_name, serialize_format="json")
+        assert update_result.success, f"Failed to update from shared memory with JSON: {update_result.error}"
+        
+        # Verify variables are restored
+        assert global_vars.get("json_var1").data == 100, "json_var1 should be restored"
+        assert global_vars.get("json_var2").data == "world", "json_var2 should be restored"
+        assert global_vars.get("json_var3").data == {"key": "value"}, "json_var3 should be restored"
+        
+        # Clean up
+        global_vars.shm_close(shm_name)
+        global_vars.clear()
+    
+    def test_shm_get(self, setup_module):
+        """Test getting shared memory object"""
+        _, _, global_vars = setup_module
+        
+        shm_name = "test_shm_get"
+        size = 1024
+        
+        # Generate shared memory
+        global_vars.shm_gen(name=shm_name, size=size, create_lock=False)
+        
+        # Get shared memory
+        get_result = global_vars.shm_get(shm_name)
+        assert get_result.success, f"Failed to get shared memory: {get_result.error}"
+        assert get_result.data is not None, "Shared memory object should be returned"
+        assert get_result.data.name == shm_name, "Shared memory name should match"
+        
+        # Clean up
+        global_vars.shm_close(shm_name)
+    
+    def test_shm_connect(self, setup_module):
+        """Test connecting to existing shared memory"""
+        _, _, global_vars = setup_module
+        
+        shm_name = "test_shm_connect"
+        size = 1024
+        
+        # Generate shared memory
+        global_vars.shm_gen(name=shm_name, size=size, create_lock=False)
+        
+        # Create a new GlobalVars instance to simulate another process
+        new_global_vars = Utils.GlobalVars(is_logging_enabled=False)
+        
+        # Connect to existing shared memory
+        connect_result = new_global_vars.shm_connect(shm_name)
+        assert connect_result.success, f"Failed to connect to shared memory: {connect_result.error}"
+        
+        # Clean up
+        new_global_vars.shm_close(shm_name, close_only=True)
+        global_vars.shm_close(shm_name)
+    
+    def test_shm_close_only(self, setup_module):
+        """Test closing shared memory without unlinking"""
+        _, _, global_vars = setup_module
+        
+        shm_name = "test_shm_close_only"
+        size = 1024
+        
+        # Generate shared memory
+        global_vars.shm_gen(name=shm_name, size=size, create_lock=False)
+        
+        # Close only (don't unlink) - Note: behavior may differ between Windows and Unix
+        close_result = global_vars.shm_close(shm_name, close_only=True)
+        assert close_result.success, f"Failed to close shared memory: {close_result.error}"
+        
+        # On Windows, shared memory may be freed immediately after close
+        # Try to reconnect - may or may not succeed depending on OS
+        connect_result = global_vars.shm_connect(shm_name)
+        if connect_result.success:
+            # If reconnect succeeded, do full close
+            global_vars.shm_close(shm_name)
+        # Test passes regardless - we just verify close_only doesn't error
+    
+    def test_shm_cache_management(self, setup_module):
+        """Test shared memory cache management"""
+        _, _, global_vars = setup_module
+        
+        # Create multiple shared memory objects to test cache limits
+        shm_names = [f"test_cache_{i}" for i in range(3)]
+        
+        for name in shm_names:
+            result = global_vars.shm_gen(name=name, size=512, create_lock=False)
+            assert result.success, f"Failed to generate shared memory {name}: {result.error}"
+        
+        # Clear cache
+        cache_result = global_vars.shm_cache_management(None, None)
+        assert cache_result.success, f"Failed to clear shared memory cache: {cache_result.error}"
+        
+        # Clean up
+        for name in shm_names:
+            try:
+                global_vars.shm_close(name)
+            except:
+                pass
+    
+    def test_shm_lock_method(self, setup_module):
+        """Test the lock() method for GlobalVars"""
+        _, _, global_vars = setup_module
+        
+        lock = global_vars.lock()
+        assert lock is not None, "Lock should be returned"
+        
+        # Test using lock
+        with lock:
+            global_vars.set("lock_test", "value")
+            assert global_vars.get("lock_test").data == "value"
+        
+        global_vars.delete("lock_test")
+    
+    def test_shm_context_manager(self, setup_module):
+        """Test GlobalVars as context manager"""
+        _, _, global_vars = setup_module
+        
+        # Test using context manager (acquires lock)
+        with global_vars:
+            global_vars.set("context_test", 123)
+            assert global_vars.get("context_test").data == 123
+        
+        global_vars.delete("context_test")
+
+
+@pytest.mark.usefixtures("setup_module")
+class TestSharedMemoryFailures:
+    """Tests for GlobalVars Shared Memory failure scenarios"""
+    
+    def test_shm_gen_invalid_name(self, setup_module):
+        """Test shared memory generation with invalid name"""
+        _, _, global_vars = setup_module
+        
+        # Empty name
+        result = global_vars.shm_gen(name="", size=1024)
+        assert not result.success, "Empty name should fail"
+        
+        # None name
+        result = global_vars.shm_gen(name=None, size=1024)
+        assert not result.success, "None name should fail"
+    
+    def test_shm_gen_invalid_size(self, setup_module):
+        """Test shared memory generation with invalid size"""
+        _, _, global_vars = setup_module
+        
+        # Zero size
+        result = global_vars.shm_gen(name="test_invalid_size", size=0)
+        assert not result.success, "Zero size should fail"
+        
+        # Negative size
+        result = global_vars.shm_gen(name="test_invalid_size", size=-100)
+        assert not result.success, "Negative size should fail"
+    
+    def test_shm_sync_nonexistent(self, setup_module):
+        """Test syncing to nonexistent shared memory"""
+        _, _, global_vars = setup_module
+        
+        result = global_vars.shm_sync("nonexistent_shm")
+        assert not result.success, "Syncing to nonexistent shared memory should fail"
+    
+    def test_shm_sync_invalid_format(self, setup_module):
+        """Test syncing with invalid serialization format"""
+        _, _, global_vars = setup_module
+        
+        shm_name = "test_invalid_format"
+        global_vars.shm_gen(name=shm_name, size=1024, create_lock=False)
+        
+        result = global_vars.shm_sync(shm_name, serialize_format="invalid_format")
+        assert not result.success, "Invalid serialization format should fail"
+        
+        global_vars.shm_close(shm_name)
+    
+    def test_shm_close_nonexistent(self, setup_module):
+        """Test closing nonexistent shared memory"""
+        _, _, global_vars = setup_module
+        
+        result = global_vars.shm_close("nonexistent_shm")
+        assert not result.success, "Closing nonexistent shared memory should fail"
+    
+    def test_shm_memory_overflow(self, setup_module):
+        """Test syncing data larger than shared memory size"""
+        _, _, global_vars = setup_module
+        
+        shm_name = "test_overflow"
+        small_size = 64  # Very small size
+        
+        global_vars.shm_gen(name=shm_name, size=small_size, create_lock=False)
+        
+        # Set a large variable
+        global_vars.set("large_var", "x" * 1000)
+        
+        # Try to sync - should fail due to size
+        result = global_vars.shm_sync(shm_name)
+        assert not result.success, "Syncing data larger than shared memory should fail"
+        
+        global_vars.delete("large_var")
+        global_vars.shm_close(shm_name)
+
+
+@pytest.mark.usefixtures("setup_module")
+class TestUtilsMethods:
+    """Tests for Utils class methods that were missing"""
+    
+    def test_insert_at_intervals_list(self, setup_module):
+        """Test insert_at_intervals with list"""
+        utils, _, _ = setup_module
+        
+        data_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        result = utils.insert_at_intervals(data_list, 3, 'X', at_start=True)
+        assert result.success, f"insert_at_intervals failed: {result.error}"
+        assert result.data[0] == 'X', "X should be inserted at start"
+    
+    def test_insert_at_intervals_string(self, setup_module):
+        """Test insert_at_intervals with string"""
+        utils, _, _ = setup_module
+        
+        data_str = "abcdefghi"
+        result = utils.insert_at_intervals(data_str, 3, '-', at_start=False)
+        assert result.success, f"insert_at_intervals failed: {result.error}"
+        assert isinstance(result.data, str), "Result should be a string"
+    
+    def test_insert_at_intervals_at_start_false(self, setup_module):
+        """Test insert_at_intervals with at_start=False"""
+        utils, _, _ = setup_module
+        
+        data_list = [1, 2, 3, 4, 5, 6]
+        result = utils.insert_at_intervals(data_list, 2, 'X', at_start=False)
+        assert result.success, f"insert_at_intervals failed: {result.error}"
+        assert result.data[0] != 'X', "X should not be at start when at_start=False"
+    
+    def test_insert_at_intervals_invalid_data(self, setup_module):
+        """Test insert_at_intervals with invalid data type"""
+        utils, _, _ = setup_module
+        
+        result = utils.insert_at_intervals(12345, 2, 'X')
+        assert not result.success, "Invalid data type should fail"
+    
+    def test_insert_at_intervals_invalid_interval(self, setup_module):
+        """Test insert_at_intervals with invalid interval"""
+        utils, _, _ = setup_module
+        
+        result = utils.insert_at_intervals([1, 2, 3], 0, 'X')
+        assert not result.success, "Zero interval should fail"
+        
+        result = utils.insert_at_intervals([1, 2, 3], -1, 'X')
+        assert not result.success, "Negative interval should fail"
+
+
+@pytest.mark.usefixtures("setup_module")
+class TestDecoratorUtilsMethods:
+    """Tests for DecoratorUtils class methods that were missing"""
+    
+    def test_make_decorator(self, setup_module):
+        """Test make_decorator method"""
+        _, decorator_utils, _ = setup_module
+        
+        def sample_function(x, y):
+            return x + y
+        
+        # Create decorated function
+        decorated = decorator_utils.make_decorator(sample_function)
+        
+        # Test successful execution
+        result = decorated(5, 3)
+        assert result == 8, "Decorated function should return correct result"
+    
+    def test_make_decorator_with_exception(self, setup_module):
+        """Test make_decorator with function that raises exception"""
+        _, decorator_utils, _ = setup_module
+        
+        def failing_function(x):
+            return 10 / x
+        
+        # Create decorated function
+        decorated = decorator_utils.make_decorator(failing_function)
+        
+        # Test exception handling
+        result = decorated(0)
+        assert not result.success, "Exception should be caught and returned as Result"
+        assert "ZeroDivisionError" in result.data["error"]["type"], "Error type should be ZeroDivisionError"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-m not performance"])

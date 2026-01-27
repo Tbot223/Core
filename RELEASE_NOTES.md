@@ -1,5 +1,48 @@
 # Release Notes
 
+## [2.1.3] - 2026-01-27
+
+### Added
+
+- **Examples**: Comprehensive example scripts for all core modules
+  - `AppCore`: `thread_pool_executor`, `process_pool_executor`, `get_text_by_lang`, `clear_console`, `exit_application`, `restart_application`, `ResultWrapper`
+  - `Exception`: `get_exception_info`, `get_exception_location`, `get_exception_return`, `ExceptionTrackerDecorator`
+  - `FileManager`: `atomic_write`, `read_file`, `read_json`, `write_json`, `list_of_files`, `create_directory`, `delete_file`, `delete_directory`
+  - `LogSys`: `make_logger`, `get_logger`, `stop_stream_handlers`, `log_message`, `SimpleSetting.get_instance`
+  - `Result`: Basic usage of Result NamedTuple
+- **LogSys**: `stop_stream_handlers()` method added to `LoggerManager`
+- **LogSys**: `SimpleSetting` now supports log level configuration
+- **Tests**: Comprehensive test coverage expansion (72% → 81%)
+  - `TestSafeCLIInput`: 15 new tests for `safe_CLI_input()` method with mocked input
+  - `TestSharedMemory`: 10 tests for SHM generation, sync, update, and cache management
+  - `TestSharedMemoryFailures`: 6 tests for SHM failure scenarios
+  - `TestUtilsMethods`: 5 tests for `insert_at_intervals()` method
+  - `TestDecoratorUtilsMethods`: 2 tests for `make_decorator()` method
+  - `TestResultClass`: 5 tests for Result NamedTuple behavior
+  - `TestResultWrapper`: 4 tests for ResultWrapper decorator
+  - Additional edge case tests for FileManager, LogSys, Exception modules
+- **Utils**: Enhanced `find_keys_by_value()` with new parameters
+  - `separator` parameter: Custom separator for nested key paths (supports "list"/"tuple" for output type)
+  - `return_mod` parameter: Control return format ("flat", "forest", "path")
+
+### Fixed
+
+- **Utils**: Fixed `_lookup_dict()` using `extend()` instead of `append()` for nested results, preventing unintended list flattening
+- **FileManager**: Added fallback for `shutil.rmtree()` compatibility (`onexc` → `onerror` for older Python versions)
+- **AppCore**: `ResultWrapper` now passes function arguments to `ExceptionTracker.get_exception_return()` via `params` parameter
+
+### Changed
+
+- **Documentation**: Improved docstrings for `thread_pool_executor`, `process_pool_executor`, application lifecycle methods
+- **Documentation**: Enhanced `ExceptionTrackerDecorator` docstring with detailed usage examples
+- **Documentation**: Improved `Result` class docstring explaining NamedTuple immutability benefits
+- **Documentation**: Clarified `FileManager.base_dir` attribute description (logging directory, not I/O base)
+- **Documentation**: Enhanced `FileManager._lock_file()` docstring with mode parameter details for Unix/Windows
+- **Documentation**: Updated README with usage warnings and clarifications
+- **Utils**: Improved `_lookup_dict()` type hints and internal logic for better nested dictionary handling
+
+---
+
 ## [2.1.2] - 2026-01-19
 
 ### Fixed

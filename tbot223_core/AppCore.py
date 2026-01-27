@@ -530,5 +530,5 @@ class ResultWrapper:
                 return Result(True, None, None, result)
             except Exception as e:
                 tracker = ExceptionTracker()
-                return tracker.get_exception_return(e)
+                return tracker.get_exception_return(error=e, params=(args, kwargs))
         return wrapper
