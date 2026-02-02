@@ -467,33 +467,6 @@ class DecoratorUtils:
             return wrapper
         return decorator
     
-    def make_decorator(self, func):
-        """
-        Decorator to handle exceptions and return a Result object.
-        
-        Args:
-            - func : The function to decorate.
-            
-        Returns:
-            A wrapper function that returns a Result object on exception.
-            
-        Example:
-            >>> def my_function(x):
-            >>>     return 10 / x
-            >>> decorated_function = DecoratorUtils().make_decorator(my_function)
-            >>> @decorated_function
-            >>> def safe_function(x):
-            >>>     return 10 / x
-            >>> result = safe_function(0)
-
-        """
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                return self._exception_tracker.get_exception_return(e)
-        return wrapper
-    
 class GlobalVars:
     """
     This class manages global variables in a controlled manner.

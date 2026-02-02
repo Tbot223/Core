@@ -1,3 +1,16 @@
+
+# TODO: Exception Module whole review and refactor needed
+# TODO: All Methods need re-structuring and optimization
+# Why? -> It's So old. So, it's not optimized, and not structured well.
+# TODO: Add tb[0] info to get the origin of exception (currently using tb[-1] only)
+# Why? -> To provide more detailed exception origin information.
+# WARNING: Method names DO NOT change ( Arguments are allowed to change )
+# Why? -> To maintain backward compatibility.
+# TODO: Add unique ID provider for exceptions (for future use)
+# Why? -> To uniquely identify exceptions for tracking and logging.
+# TODO: All Moudules need to be re-checked for use of ExceptionTracker
+# Why? -> To ensure consistent exception handling across the codebase.
+
 # external modules
 import sys
 import os
@@ -38,6 +51,7 @@ class ExceptionTracker():
             "Python_Executable": sys.executable,
             "Current_Working_Directory": cwd
         }
+        self_error_ids = dict() # TODO: Reserved for future use (to provide unique IDs for exceptions)
 
     def get_exception_location(self, error: Exception) -> Result:
         """
@@ -158,6 +172,9 @@ class ExceptionTracker():
             print("An error occurred while handling another exception. This may indicate a critical issue.")
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, R125-155", tb_str)
+    
+    def id_provider(self):
+        pass # TODO: Method to provide unique IDs for exceptions (for future use)
         
 class ExceptionTrackerDecorator():
     """
