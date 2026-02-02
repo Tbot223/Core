@@ -81,7 +81,6 @@ Thread-safe global variable management with shared memory support:
 #### DecoratorUtils ( in Utils.py )
 Utility decorators:
 - Runtime measurement decorator (`runtime()`)
-- Function-to-decorator converter (`make_decorator()`)
 
 ### ExceptionTracker
 Comprehensive error tracking:
