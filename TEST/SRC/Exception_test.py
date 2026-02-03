@@ -40,7 +40,7 @@ class TestExceptionTracker:
             self.zero_division()
 
         error = exc_info.value
-        result = tracker.get_exception_info(error)
+        result = tracker.get_exception_info(error, params=((), {}), mask_tuple=(False, False, False, False))
         assert result.success is True
         assert result.data["error"]["type"] == "ZeroDivisionError"
 
@@ -48,7 +48,7 @@ class TestExceptionTracker:
             self.zero_division()
 
         error_masking = exc_masking.value
-        result_masking = tracker.get_exception_info(error_masking, masking=True)
+        result_masking = tracker.get_exception_info(error_masking, params=((), {}), mask_tuple=(False, False, False, True))
         assert result_masking.success is True
         assert result_masking.data["computer_info"] == "<Masked>"
 
@@ -60,7 +60,7 @@ class TestExceptionTracker:
             self.zero_division()
 
         error = exc_info.value
-        result = tracker.get_exception_return(error)
+        result = tracker.get_exception_return(error, params=((), {}), mask_tuple=(False, False, False, False))
         assert result.success is False
         assert result.data["error"]["type"] == "ZeroDivisionError"
 
@@ -68,9 +68,10 @@ class TestExceptionTracker:
             self.zero_division()
 
         error_masking = exc_masking.value
-        result_masking = tracker.get_exception_return(error_masking, masking=True)
+        # Test that masking works (computer_info should be masked)
+        result_masking = tracker.get_exception_return(error_masking, params=((), {}), mask_tuple=(False, False, False, True))
         assert result_masking.success is False
-        assert result_masking.data == "<Masked>"
+        assert result_masking.data["computer_info"] == "<Masked>"
 
     def test_system_info_initialization(self) -> None:
         """
@@ -94,7 +95,8 @@ class TestExceptionTracker:
         """
         result = self.dummy_method(0)
         
-        assert result.data["error"]["type"] == "ZeroDivisionError"
+        assert result.success is False
+        assert "ZeroDivisionError" in result.error
     
     def test_get_exception_info_with_params(self, tracker: Exception.ExceptionTracker) -> None:
         """
@@ -107,7 +109,8 @@ class TestExceptionTracker:
         result = tracker.get_exception_info(
             error, 
             user_input="test_input", 
-            params=((1, 2), {"key": "value"})
+            params=((1, 2), {"key": "value"}),
+            mask_tuple=(False, False, False, False)
         )
         
         assert result.success is True
@@ -129,7 +132,7 @@ class TestExceptionTracker:
         )
         
         assert result.success is False
-        assert "ZeroDivisionError" in result.data["error"]["type"]
+        assert "ZeroDivisionError" in result.error
     
     @Exception.ExceptionTrackerDecorator(masking=True, tracker=Exception.ExceptionTracker())
     def dummy_method_masked(self, x: int) -> str:
@@ -145,7 +148,9 @@ class TestExceptionTracker:
         result = self.dummy_method_masked(0)
         
         assert result.success is False
-        assert result.data == "<Masked>"
+        # When masking=True, all fields in data dict are masked
+        assert result.data["computer_info"] == "<Masked>"
+        assert result.data["input_context"]["user_input"] == "<Masked>"
     
     @Exception.ExceptionTrackerDecorator(masking=False, tracker=Exception.ExceptionTracker())
     def successful_method(self, x: int) -> int:
@@ -196,7 +201,7 @@ class TestExceptionEdgeCases:
         except ZeroDivisionError as e:
             error = e
         
-        result = tracker.get_exception_info(error)
+        result = tracker.get_exception_info(error, params=((), {}), mask_tuple=(False, False, False, False))
         timestamp = result.data["timestamp"]
         # Should be in YYYY-MM-DD HH:MM:SS format
         assert len(timestamp) == 19

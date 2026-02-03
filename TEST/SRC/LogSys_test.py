@@ -3,6 +3,7 @@ import pytest
 from pathlib import Path
 
 # internal Modules
+from tbot223_core.LogSys import LoggerManager, Log
 from tbot223_core import LogSys
 
 @pytest.fixture(scope="module")
@@ -11,7 +12,7 @@ def setup_module(tmp_path_factory):
     Fixture to create a LoggerManager instance for testing.
     """
     tmp_path = tmp_path_factory.mktemp("test")
-    return LogSys.LoggerManager(base_dir=tmp_path / "logs", second_log_dir="test_logs"), LogSys.Log()
+    return LoggerManager(base_dir=tmp_path / "logs", second_log_dir="test_logs"), Log()
 
 @pytest.mark.usefixtures("setup_module")
 class TestLogSys:
@@ -76,7 +77,7 @@ class TestLogSysEdgeCases:
         _, log = setup_module
         
         # Create a new Log instance without logger
-        empty_log = LogSys.Log(logger=None)
+        empty_log = Log(logger=None)
         result = empty_log.log_message("INFO", "Test message")
         assert not result.success, "Logging without logger should fail"
     
@@ -88,7 +89,7 @@ class TestLogSysEdgeCases:
         logger_name = "level_test_logger"
         logger_manager.make_logger(logger_name=logger_name, log_level="DEBUG")
         logger = logger_manager.get_logger(logger_name).data
-        log = LogSys.Log(logger=logger)
+        log = Log(logger=logger)
         
         # Test all levels
         for level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:

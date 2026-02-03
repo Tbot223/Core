@@ -51,8 +51,8 @@ class ExceptionTracker():
             "Python_Executable": sys.executable,
             "Current_Working_Directory": cwd
         }
-        self_error_ids = dict() # TODO: Reserved for future use (to provide unique IDs for exceptions)
 
+    # L1 Methods
     def get_exception_location(self, error: Exception) -> Result:
         """
         Function to track where exceptions occurred and return related information
@@ -79,9 +79,10 @@ class ExceptionTracker():
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_location, R42-67", tb_str)
+            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_location, L1", tb_str)
 
-    def get_exception_info(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=None, masking: bool=False) -> Result:
+    # L2 Methods
+    def get_exception_info(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=None, mask_tuple: Tuple[bool, ...] = ()) -> Result:
         """
         Function to track exception information and return related information
         
@@ -89,10 +90,15 @@ class ExceptionTracker():
         If masking is True, computer information will be masked.
 
         Args:
-            - error (Exception): The exception object to track.
-            - user_input (Any, optional): User input context related to the exception. Defaults to None.
-            - params (Tuple[Tuple, dict], optional): Additional parameters related to the exception. Defaults to None. expected format: (args, kwargs)
-            - masking (bool, optional): If True, computer information will be masked. Defaults to False.
+            - error : The exception object to track.
+            - user_input : User input context related to the exception. Defaults to None.
+            - params : Additional parameters related to the exception. Defaults to None. expected format: (args, kwargs)
+            - mask_tuple : A tuple of booleans indicating which parts of the error information to mask. Defaults to an empty tuple.
+
+        Note:
+            The mask_tuple should be in the order of ("user_input", "params", "traceback", "computer_info").
+            If an element in the tuple is True, the corresponding part of the error information will be masked.
+            e.g., mask_tuple = (True, False, True, False) will mask "user_input" and "traceback".
 
         Returns:
             Result: A Result object containing detailed information about the exception.
@@ -106,13 +112,25 @@ class ExceptionTracker():
             >>>     # This will raise a ZeroDivisionError
             >>>     divide(a, b)
             >>> except Exception as e:
-            >>>     info_result = tracker.get_exception_info(e, user_input="Divide operation", params=((a, b), {"a":a, "b":b}), masking=False)
+            >>>     info_result = tracker.get_exception_info(e, user_input="Divide operation", params=((a, b), {"a":a, "b":b}), mask_tuple=(False, False, False, False))
             >>>     print(info_result.data)
             >>> # Output: ( error_info dict, see Readme.md for structure )
         """
         try:
+            if error is None:
+                raise ValueError("The 'error' argument must be an Exception instance, not None.")
+            if isinstance(params[0], tuple) is False or isinstance(params[1], dict) is False:
+                raise ValueError("The 'params' argument must be a tuple of (args, kwargs).")
+            if not isinstance(mask_tuple, tuple) or not all(isinstance(i, bool) for i in mask_tuple):
+                raise ValueError("The 'mask_tuple' argument must be a tuple of booleans.")
+            if len(mask_tuple) != 4:
+                raise ValueError("The 'mask_tuple' argument must have exactly 4 boolean values.")
+
             tb = traceback.extract_tb(error.__traceback__)
             frame = tb[-1]  # Most recent frame
+
+            masking = lambda index, return_value: "<Masked>" if mask_tuple[index] else return_value
+
             error_info = {
                 "success": False,
                 "error":{
@@ -126,22 +144,24 @@ class ExceptionTracker():
                 },
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
                 "input_context": {
-                    "user_input": user_input,
-                    "params": {
+                    "user_input": masking(0, user_input),
+                    "params": masking(1, {
                         "args": params[0] if params else (),
                         "kwargs": params[1] if params else {}
-                    }
+                    }) 
                 },
-                "traceback": ''.join(traceback.format_exception(type(error), error, error.__traceback__)),
-                "computer_info": self._system_info if not masking else "<Masked>"
+                "id": None,  # Reserved for future use (to provide unique IDs for exceptions)
+                "traceback": masking(2, ''.join(traceback.format_exception(type(error), error, error.__traceback__))),
+                "computer_info": masking(3, self._system_info)
             }
             return Result(True, None, None, error_info)
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_info, R69-123", tb_str)
-        
-    def get_exception_return(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=None, masking: bool=False) -> Result:
+            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_info, L1", tb_str)
+    
+    # L2 Methods
+    def get_exception_return(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=None, mask_tuple: Tuple[bool, ...]=()) -> Result:
         """
         A convenience function to standardize the return of exception information. It's designed to be used in exception handling blocks.
         ( Includes exception type, message, location, and detailed info. )
@@ -151,10 +171,15 @@ class ExceptionTracker():
         If masking is True, Exception information will be masked.
 
         Args:
-            - error (Exception): The exception object to track.
-            - user_input (Any, optional): User input context related to the exception. Defaults to None.
-            - params (Tuple[Tuple, dict], optional): Additional parameters related to the exception. Defaults to None. expected format: (args, kwargs)
-            - masking (bool, optional): If True, exception information will be masked. Defaults to False.
+            - error : The exception object to track.
+            - user_input : User input context related to the exception. Defaults to None.
+            - params : Additional parameters related to the exception. Defaults to None. expected format: (args, kwargs)
+            - mask_tuple : A tuple of booleans indicating which parts of the error information to mask. Defaults to an empty tuple.
+
+        Note:
+            The mask_tuple should be in the order of ("user_input", "params", "traceback", "computer_info").
+            If an element in the tuple is True, the corresponding part of the error information will be masked.
+            e.g., mask_tuple = (True, False, True, False) will mask "user_input" and "traceback".
 
         Returns:
             Result: A dictionary containing detailed information about the exception.
@@ -167,13 +192,14 @@ class ExceptionTracker():
             >>> Result(False, 'ZeroDivisionError :division by zero', "'script.py', line 10, in <module>", '<Masked>')
         """
         try:
-            return Result(False, f"{type(error).__name__} :{str(error)}", self.get_exception_location(error).data, self.get_exception_info(error, user_input, params).data if not masking else "<Masked>")
+            effective_mask = mask_tuple if len(mask_tuple) == 4 else (False, False, False, False)
+            return Result(False, f"{type(error).__name__} :{str(error)}", self.get_exception_location(error).data, self.get_exception_info(error, user_input, params, mask_tuple=effective_mask).data)
         except Exception as e:
             print("An error occurred while handling another exception. This may indicate a critical issue.")
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, R125-155", tb_str)
+            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, L2", tb_str)
     
-    def id_provider(self):
+    def get_unique_id(self):
         pass # TODO: Method to provide unique IDs for exceptions (for future use)
         
 class ExceptionTrackerDecorator():
@@ -211,5 +237,7 @@ class ExceptionTrackerDecorator():
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                return self.tracker.get_exception_return(error=e, params=(args, kwargs), masking=self.masking)
+                # When masking=True, mask all fields; otherwise mask nothing
+                mask_tuple = (True, True, True, True) if self.masking else (False, False, False, False)
+                return self.tracker.get_exception_return(error=e, params=(args, kwargs), mask_tuple=mask_tuple)
         return wrapper

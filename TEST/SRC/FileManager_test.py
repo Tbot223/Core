@@ -12,7 +12,7 @@ def file_manager():
     Fixture to create a FileManager instance for testing.
     """
     base_dir = Path(__file__).resolve().parent
-    file_manager = FileManager.FileManager(base_dir=base_dir)
+    file_manager = FileManager(base_dir=base_dir)
     return file_manager
 
 @pytest.mark.usefixtures("tmp_path", "file_manager")
@@ -149,7 +149,7 @@ class TestFileManagerXfails:
         # Test reading a non-existent file
         read_result = file_manager.read_file(file_path=nonexistent_file, as_bytes=False)
         assert not read_result.success, "Read operation unexpectedly succeeded for a non-existent file."
-        assert read_result.data["error"]["type"] == "FileNotFoundError", "Error is not FileNotFoundError for non-existent file."
+        assert "FileNotFoundError" in read_result.error, "Error is not FileNotFoundError for non-existent file."
 
 class TestFileManagerEdgeCases:
     def test_atomic_write_failure_protection(self, file_manager, tmp_path):

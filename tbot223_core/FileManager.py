@@ -15,7 +15,8 @@ else:
 #internal Modules
 from tbot223_core.Result import Result
 from tbot223_core.Exception import ExceptionTracker
-from tbot223_core import Utils, LogSys
+from tbot223_core.LogSys import LoggerManager, Log
+from tbot223_core.Utils.Utils import Utils
 
 class FileManager:
     """
@@ -61,8 +62,8 @@ class FileManager:
 
     def __init__(self, is_logging_enabled: bool=True, is_debug_enabled: bool=False,
                  base_dir: Union[str, Path]=None,
-                 logger_manager_instance: Optional[LogSys.LoggerManager]=None, logger: Optional[logging.Logger]=None, 
-                 log_instance: Optional[LogSys.Log]=None, Utils_instance: Optional[Utils.Utils]=None):
+                 logger_manager_instance: Optional[LoggerManager]=None, logger: Optional[logging.Logger]=None, 
+                 log_instance: Optional[Log]=None, Utils_instance: Optional[Utils]=None):
         
         # Initialize paths
         self._BASE_DIR = Path(base_dir) if base_dir is not None else Path.cwd()
@@ -76,11 +77,11 @@ class FileManager:
         self._logger_manager = None
         self.logger = None
         if self.__is_logging_enabled__:
-            self._logger_manager = logger_manager_instance or LogSys.LoggerManager(base_dir=self._BASE_DIR / "logs", second_log_dir="file_manager")
+            self._logger_manager = logger_manager_instance or LoggerManager(base_dir=self._BASE_DIR / "logs", second_log_dir="file_manager")
             self._logger_manager.make_logger("FileManagerLogger")
             self.logger = logger or self._logger_manager.get_logger("FileManagerLogger").data
-        self.log = log_instance or LogSys.Log(logger=self.logger)
-        self._utils = Utils_instance or Utils.Utils()
+        self.log = log_instance or Log(logger=self.logger)
+        self._utils = Utils_instance or Utils()
 
         if self.__is_logging_enabled__:
             self.log.log_message("INFO", "FileManager initialized.")
@@ -181,7 +182,6 @@ class FileManager:
             >>>     print(f"Write failed: {result.error_message}")
         """
         try:
-            temp_path = None
             file_path = self._str_to_path(file_path)
             if not file_path.parent.exists():
                 file_path.parent.mkdir(parents=True, exist_ok=True)

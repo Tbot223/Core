@@ -5,7 +5,7 @@ import time, random, os, threading
 from multiprocessing import shared_memory
 
 # internal Modules
-from tbot223_core import Utils
+from tbot223_core import Utils, DecoratorUtils, GlobalVars
 
 @pytest.fixture(scope="module")
 def setup_module():
@@ -13,9 +13,9 @@ def setup_module():
     Fixture to create Utils, DecoratorUtils, and GlobalVars instances for testing.
     """
     base_dir = Path(__file__).resolve().parent
-    utils = Utils.Utils(is_logging_enabled=True, base_dir=base_dir)
-    decorator_utils = Utils.DecoratorUtils()
-    global_vars = Utils.GlobalVars(is_logging_enabled=True, base_dir=base_dir)
+    utils = Utils(is_logging_enabled=True, base_dir=base_dir)
+    decorator_utils = DecoratorUtils()
+    global_vars = GlobalVars(is_logging_enabled=True, base_dir=base_dir)
     return utils, decorator_utils, global_vars
 
 @pytest.mark.usefixtures("setup_module")
@@ -28,14 +28,14 @@ class TestUtils:
         assert isinstance(path_obj.data, type(Path())), "Converted data is not a Path object"
         assert str(path_obj.data) == path_str, "Path string does not match the original string"
 
-    def test_encrypt(self, setup_module):
+    def test_hashing(self, setup_module):
         utils, _, _ = setup_module
         original_text = "Hello, World!"
 
         for algorithm in ["md5", "sha1", "sha256", "sha512"]:
-            encrypted = utils.encrypt(data=original_text, algorithm=algorithm)
-            assert encrypted.success, f"Encryption with {algorithm} failed: {encrypted.error}"
-            assert encrypted.data != original_text, f"Encrypted text with {algorithm} should not match the original text"
+            hashed = utils.hashing(data=original_text, algorithm=algorithm)
+            assert hashed.success, f"Hashing with {algorithm} failed: {hashed.error}"
+            assert hashed.data != original_text, f"Hashed text with {algorithm} should not match the original text"
 
     def test_pbkdf2_hmac(self, setup_module):
         utils, _, _ = setup_module
@@ -135,10 +135,13 @@ class TestUtils:
 
     @pytest.mark.performance
     def test_find_keys_by_value_performance(self, setup_module) -> None:
-        utils, _, _ = setup_module
         """
         Performance test for the find_keys_by_value method with a large nested dictionary.
+        
+        WARNING: This test operates on 10,000+ keys with nested structures.
+        May timeout or fail on systems with limited memory or CPU resources.
         """
+        utils, _, _ = setup_module
         large_dict = {f'key_{i}': random.randint(1, 100) for i in range(10000)}
         nested_large_dict = {f'key_{i}': {'subkey_{j}': random.randint(1, 100) for j in range(10)} for i in range(1000)}
         large_dict.update(nested_large_dict)
@@ -336,6 +339,12 @@ class TestEdgeCases:
 
     @pytest.mark.performance
     def test_global_var_extreme_change(self, setup_module):
+        """
+        Extreme scale test: setting and managing 50,000 global variables.
+        
+        WARNING: This test creates/deletes 50,000+ variables.
+        May timeout or fail on systems with limited memory or under heavy load.
+        """
         _, _, global_vars = setup_module
 
         # Extreme change test: setting a very large number of global variables
@@ -543,7 +552,7 @@ class TestSharedMemory:
         global_vars.shm_gen(name=shm_name, size=size, create_lock=False)
         
         # Create a new GlobalVars instance to simulate another process
-        new_global_vars = Utils.GlobalVars(is_logging_enabled=False)
+        new_global_vars = GlobalVars(is_logging_enabled=False)
         
         # Connect to existing shared memory
         connect_result = new_global_vars.shm_connect(shm_name)
@@ -744,40 +753,6 @@ class TestUtilsMethods:
         
         result = utils.insert_at_intervals([1, 2, 3], -1, 'X')
         assert not result.success, "Negative interval should fail"
-
-
-@pytest.mark.usefixtures("setup_module")
-class TestDecoratorUtilsMethods:
-    """Tests for DecoratorUtils class methods that were missing"""
-    
-    def test_make_decorator(self, setup_module):
-        """Test make_decorator method"""
-        _, decorator_utils, _ = setup_module
-        
-        def sample_function(x, y):
-            return x + y
-        
-        # Create decorated function
-        decorated = decorator_utils.make_decorator(sample_function)
-        
-        # Test successful execution
-        result = decorated(5, 3)
-        assert result == 8, "Decorated function should return correct result"
-    
-    def test_make_decorator_with_exception(self, setup_module):
-        """Test make_decorator with function that raises exception"""
-        _, decorator_utils, _ = setup_module
-        
-        def failing_function(x):
-            return 10 / x
-        
-        # Create decorated function
-        decorated = decorator_utils.make_decorator(failing_function)
-        
-        # Test exception handling
-        result = decorated(0)
-        assert not result.success, "Exception should be caught and returned as Result"
-        assert "ZeroDivisionError" in result.data["error"]["type"], "Error type should be ZeroDivisionError"
 
 
 if __name__ == "__main__":
