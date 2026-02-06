@@ -7,7 +7,7 @@ BASE_DIR=Path(__file__).resolve().parents[1] / ".OtherFiles"
 
 if __name__ == "__main__":
     # Initialize AppCore
-    ap = AppCore.AppCore(is_logging_enabled=True, base_dir=BASE_DIR)
+    ap = AppCore(is_logging_enabled=True, base_dir=BASE_DIR)
 
     # dirty work to show the console clearing
     print("This is some text in the console.", end="\n\n")

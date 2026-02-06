@@ -1,5 +1,46 @@
 # Release Notes
 
+## [3.0.0] - 2026-02-07
+
+### Breaking Changes
+
+- **Import System Overhaul**: Classes can now be imported and used directly
+  - Before: `from tbot223_core import FileManager` → `FileManager.FileManager()`
+  - After: `from tbot223_core import FileManager` → `FileManager()`
+- **Utils Module Split**: `Utils.py` split into subpackage `Utils/`
+  - `Utils/Utils.py` - Utility functions
+  - `Utils/GlobalVars.py` - Global variable management
+  - `Utils/DecoratorUtils.py` - Decorator utilities
+- **Exception API Changes**:
+  - Added `mask_tuple` parameter to `get_exception_info()` and `get_exception_return()`
+  - Added `get_error_code()` method
+  - `ExceptionTrackerDecorator` now uses `mask_tuple` for masking
+- **Result Object Changes**:
+  - `success` field type changed from `bool` to `Optional[bool]` (None = cancelled/not executed)
+
+### Added
+
+- **Result Methods**: New methods for Result object
+  - `unwrap()` - Returns data if successful, raises `ResultUnwrapException` if failed or cancelled
+  - `expect()` - Returns data if successful, raises `ResultUnwrapException` if not successful
+  - `unwrap_or(default)` - Returns data if successful, otherwise returns default value
+- **ResultUnwrapException**: New exception class for unwrap failures
+- **Exception Methods**: `get_error_code()` function for returning unique identifiers
+- **Tests**: Added `Result_test.py` with comprehensive Result object tests
+
+### Changed
+
+- **Default Workers**: `thread_pool_executor` and `process_pool_executor` now default to `os.cpu_count()`
+- **Timeout Handling**: Improved `as_completed` timeout scaling in executors
+- **Examples Updated**: All example files updated to reflect new import system
+- **Tests Refactored**: Removed duplicate/overlapping tests for cleaner test suite
+
+### Removed
+
+- **Examples.md**: Removed from repository (examples still available in `examples/` directory)
+
+---
+
 ## [2.1.3] - 2026-01-27
 
 ### Added

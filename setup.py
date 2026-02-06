@@ -5,13 +5,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='tbot223-core',
-    version='2.1.3',
+    version='3.0.0',
     description='A core utility package for tbot223 projects.',
     long_description=long_description,
     long_description_content_type="text/markdown",
     author='tbot223',
     author_email='tbotxyz@gmail.com',
-    url='https://github.com/Tbot223/Core',
+    url='https://github.com/Tbot223/tbot223-core',
     install_requires=[],
     packages=find_packages(include=['tbot223_core', 'tbot223_core.*']),
     keywords=['pypi', 'package', 'utilities', 'python', 'tbot223'],

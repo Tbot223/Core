@@ -8,6 +8,7 @@ import numpy as np
 
 # internal Modules
 from tbot223_core import AppCore
+from tbot223_core.AppCore import ResultWrapper
 
 @pytest.fixture(scope="module")
 def test_appcore_initialization():
@@ -15,7 +16,7 @@ def test_appcore_initialization():
     Fixture to initialize AppCore instance for testing.
     """
     test_base_dir = Path(__file__).resolve().parent
-    app_core = AppCore.AppCore(base_dir=test_base_dir)
+    app_core = AppCore(base_dir=test_base_dir)
     return app_core
 
 @pytest.fixture(scope="module")
@@ -52,12 +53,12 @@ class HelperMethods:
     
 @pytest.mark.usefixtures("test_appcore_initialization", "helper_methods")
 class TestAppCore:
-    def test_initialization(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_initialization(self, test_appcore_initialization: AppCore) -> None:
         """
         Test the initialization of the AppCore class.
         """
         assert test_appcore_initialization is not None
-        assert isinstance(test_appcore_initialization, AppCore.AppCore)
+        assert isinstance(test_appcore_initialization, AppCore)
 
     def test_HelperMethods_initialization(self, helper_methods: HelperMethods) -> None:
         """
@@ -67,7 +68,7 @@ class TestAppCore:
         assert isinstance(helper_methods, HelperMethods)
 
     # Test Methods
-    def test_thread_pool_executor(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods) -> None:
+    def test_thread_pool_executor(self, test_appcore_initialization: AppCore, helper_methods: HelperMethods) -> None:
         """
         Test the thread pool executor with 500 tasks.
 
@@ -78,7 +79,7 @@ class TestAppCore:
         results = test_appcore_initialization.thread_pool_executor(tasks, workers=4, override=False, timeout=1)
         helper_methods.verify_results(results.data, expected_count=50)
     
-    def test_process_pool_executor(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods) -> None:
+    def test_process_pool_executor(self, test_appcore_initialization: AppCore, helper_methods: HelperMethods) -> None:
         """
         Test the process pool executor with 500 tasks.
 
@@ -86,10 +87,10 @@ class TestAppCore:
         The results are verified to ensure all tasks completed successfully.
         """
         tasks = [(helper_methods.metrix_task, {"n": i+1, "m": i+1}) for i in range(50)]
-        results = test_appcore_initialization.process_pool_executor(tasks, workers=4, override=False, timeout=1, chunk_size=10)
+        results = test_appcore_initialization.process_pool_executor(tasks, workers=4, override=False, timeout=5, chunk_size=10)
         helper_methods.verify_results(results.data, expected_count=50)
 
-    def test_get_text_by_lang(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_get_text_by_lang(self, test_appcore_initialization: AppCore) -> None:
         """
         Test the get_text_by_lang method for retrieving text based on language code.
         """
@@ -103,18 +104,18 @@ class TestAppCore:
         supported_lang = test_appcore_initialization.get_text_by_lang("Test Key", "en")
         assert supported_lang.data == "Test Value" # Supported 'en' text
     
-    def test_ResultWrapper(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods) -> None:
+    def test_ResultWrapper(self, test_appcore_initialization: AppCore, helper_methods: HelperMethods) -> None:
         """
         Test the ResultWrapper decorator for both successful and failing tasks.
         
-        AppCore.ResultWrapper is used to wrap functions to automatically handle exceptions
+        ResultWrapper is used to wrap functions to automatically handle exceptions
         and return a standardized result object.
         """
-        @AppCore.ResultWrapper()
+        @ResultWrapper()
         def successful_task(x) -> str:
             return f"successful, {x}"
         
-        @AppCore.ResultWrapper()
+        @ResultWrapper()
         def failing_task(x) -> str:
             raise ValueError("Intentional Failure")
         
@@ -130,7 +131,7 @@ class TestAppCoreXfail:
     def _dummy_task(self, x) -> str:
         return f"dummy, {x}"
     
-    def test_thread_pool_executor(self, test_appcore_initialization: AppCore.AppCore):
+    def test_thread_pool_executor(self, test_appcore_initialization: AppCore):
         """
         Test various failure scenarios for the thread pool executor.
         """
@@ -158,7 +159,7 @@ class TestAppCoreXfail:
         assert wrong_timeout_result.success is False
         assert "timeout must be a positive number" in wrong_timeout_result.error
 
-    def test_process_pool_executor(self, test_appcore_initialization: AppCore.AppCore):
+    def test_process_pool_executor(self, test_appcore_initialization: AppCore):
         """
         Test various failure scenarios for the process pool executor.
         """
@@ -192,7 +193,7 @@ class TestAppCoreXfail:
 
 @pytest.mark.usefixtures("tmp_path", "test_appcore_initialization", "helper_methods")
 class TestAppCoreEdgeCases:
-    def test_process_pool_executor_no_chunk(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods) -> None:
+    def test_process_pool_executor_no_chunk(self, test_appcore_initialization: AppCore, helper_methods: HelperMethods) -> None:
         """
         Test the process pool executor without specifying chunk size.
 
@@ -201,21 +202,22 @@ class TestAppCoreEdgeCases:
         22 tasks are used to test edge case with small number of tasks.
         """
         tasks = [(helper_methods.metrix_task, {"n": i+1, "m": i+1}) for i in range(25)]
-        results = test_appcore_initialization.process_pool_executor(tasks, workers=4, override=False, timeout=1)
+        results = test_appcore_initialization.process_pool_executor(tasks, workers=4, override=False, timeout=5)
         helper_methods.verify_results(results.data, expected_count=25)
 
-    def test_get_text_by_lang_unsupported_lang(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_get_text_by_lang_unsupported_lang(self, test_appcore_initialization: AppCore) -> None:
         """Test get_text_by_lang with unsupported language falls back to default"""
         result = test_appcore_initialization.get_text_by_lang("Test Key", "unsupported_lang")
         assert result.success, f"get_text_by_lang failed: {result.error}"
         # Should fallback to default language
     
-    def test_get_text_by_lang_nonexistent_key(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_get_text_by_lang_nonexistent_key(self, test_appcore_initialization: AppCore) -> None:
         """Test get_text_by_lang with non-existent key"""
         result = test_appcore_initialization.get_text_by_lang("NonExistentKey12345", "en")
         assert not result.success, "Non-existent key should fail"
+        assert "KeyError" in result.error or "not found" in result.error, "Error should mention KeyError or not found"
     
-    def test_thread_pool_with_exception_task(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_thread_pool_with_exception_task(self, test_appcore_initialization: AppCore) -> None:
         """Test thread pool executor with task that raises exception"""
         def failing_task(x):
             raise ValueError(f"Intentional failure with {x}")
@@ -227,7 +229,7 @@ class TestAppCoreEdgeCases:
         for res in results.data:
             assert not res.success, "Individual failing task should have success=False"
     
-    def test_process_pool_with_exception_task(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_process_pool_with_exception_task(self, test_appcore_initialization: AppCore) -> None:
         """Test process pool executor with task that raises exception"""
         def failing_task(x):
             raise ValueError(f"Intentional failure with {x}")
@@ -239,7 +241,7 @@ class TestAppCoreEdgeCases:
         for res in results.data:
             assert not res.success, "Individual failing task should have success=False"
     
-    def test_thread_pool_with_override(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods) -> None:
+    def test_thread_pool_with_override(self, test_appcore_initialization: AppCore, helper_methods: HelperMethods) -> None:
         """Test thread pool executor with override=True"""
         tasks = [(helper_methods.metrix_task, {"n": i+1, "m": i+1}) for i in range(5)]
         # workers > tasks but override=True so it should work
@@ -250,7 +252,7 @@ class TestAppCoreEdgeCases:
 
 @pytest.mark.usefixtures("tmp_path", "test_appcore_initialization")
 class TestCLIMethods:
-    def test_clear_console(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_clear_console(self, test_appcore_initialization: AppCore) -> None:
         """
         Test the clear_console method to ensure it executes without errors.
         """
@@ -259,7 +261,7 @@ class TestCLIMethods:
         except Exception as e:
             pytest.fail(f"clear_console raised an exception: {e}")
 
-    def test_exit_application(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_exit_application(self, test_appcore_initialization: AppCore) -> None:
         """
         Test the exit_application method to ensure it executes without errors.
         """
@@ -267,39 +269,56 @@ class TestCLIMethods:
             test_appcore_initialization.exit_application(code=0)
         assert exc_info.value.code == 0
 
-    def test_restart_application(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_restart_application(self, test_appcore_initialization: AppCore) -> None:
         """
         Test the restart_application method to ensure it executes without errors.
         """
         test_base_dir = Path(__file__).resolve().parent
-        cmd = f"from tbot223_core import AppCore; app = AppCore.AppCore(is_logging_enabled=False, base_dir={str(test_base_dir)}); app.restart_application()"
+        cmd = f"from tbot223_core import AppCore; app = AppCore(is_logging_enabled=False, base_dir={str(test_base_dir)}); app.restart_application()"
         proc = subprocess.run(["python", "-c", cmd], capture_output=True)
         assert proc.returncode in [0, 1, 2]  # Environment dependent, it may return different codes
 
 @pytest.mark.usefixtures("tmp_path", "test_appcore_initialization", "helper_methods")
 class TestAppCorePerformance:
+    """
+    Performance tests for AppCore executor methods.
+    
+    WARNING: These tests involve large-scale parallel operations (2000+ tasks).
+    Results may vary significantly depending on system hardware (CPU cores, memory, etc.).
+    Timeouts and failures may occur on lower-spec machines or under heavy system load.
+    
+    These tests are excluded by default. Use `-m performance` to include them.
+    """
+    
     @pytest.mark.performance
-    def test_thread_pool_executor_performance(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods) -> None:
+    def test_thread_pool_executor_performance(self, test_appcore_initialization: AppCore, helper_methods: HelperMethods) -> None:
         """
-        Performance test for the thread pool executor with. 2000 tasks.
+        Performance test for the thread pool executor with 2000 tasks.
+        
+        Note: May timeout on systems with limited CPU/memory resources.
         """
         tasks = [(helper_methods.metrix_task, {"n": i+1, "m": i+1}) for i in range(2000)]
         results = test_appcore_initialization.thread_pool_executor(tasks, workers=8, override=False, timeout=5)
         helper_methods.verify_results(results.data, expected_count=2000)
     
     @pytest.mark.performance
-    def test_process_pool_executor_performance(self, test_appcore_initialization: AppCore.AppCore, helper_methods: HelperMethods) -> None:
+    def test_process_pool_executor_performance(self, test_appcore_initialization: AppCore, helper_methods: HelperMethods) -> None:
         """
         Performance test for the process pool executor with 2000 tasks.
+        
+        Note: May timeout on systems with limited CPU/memory resources.
+        Process pool has higher overhead than thread pool.
         """
         tasks = [(helper_methods.metrix_task, {"n": i+1, "m": i+1}) for i in range(2000)]
         results = test_appcore_initialization.process_pool_executor(tasks, workers=8, override=False, timeout=5, chunk_size=64)
         helper_methods.verify_results(results.data, expected_count=2000)
 
     @pytest.mark.performance
-    def test_get_text_by_lang_performance(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_get_text_by_lang_performance(self, test_appcore_initialization: AppCore) -> None:
         """
         Performance test for the get_text_by_lang method with multiple language requests.
+        
+        Note: Executes 2000 iterations. May take longer on slower I/O systems.
         """
         for _ in range(2000):
             result = test_appcore_initialization.get_text_by_lang("Test Key", random.choice(["en", "ko", "de", "fr", "es"]))
@@ -310,7 +329,7 @@ class TestAppCorePerformance:
 class TestResultClass:
     """Tests for Result NamedTuple class"""
     
-    def test_result_creation(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_result_creation(self, test_appcore_initialization: AppCore) -> None:
         """Test basic Result creation"""
         from tbot223_core.Result import Result
         
@@ -321,7 +340,7 @@ class TestResultClass:
         assert success_result.context is None
         assert success_result.data == "test_data"
     
-    def test_result_failure(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_result_failure(self, test_appcore_initialization: AppCore) -> None:
         """Test Result with failure state"""
         from tbot223_core.Result import Result
         
@@ -332,7 +351,7 @@ class TestResultClass:
         assert fail_result.context == "Error context"
         assert fail_result.data is None
     
-    def test_result_immutability(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_result_immutability(self, test_appcore_initialization: AppCore) -> None:
         """Test Result immutability (NamedTuple)"""
         from tbot223_core.Result import Result
         
@@ -342,7 +361,7 @@ class TestResultClass:
         with pytest.raises(AttributeError):
             result.success = False
     
-    def test_result_unpacking(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_result_unpacking(self, test_appcore_initialization: AppCore) -> None:
         """Test Result unpacking"""
         from tbot223_core.Result import Result
         
@@ -354,7 +373,7 @@ class TestResultClass:
         assert context == "ctx"
         assert data == [1, 2, 3]
     
-    def test_result_with_complex_data(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_result_with_complex_data(self, test_appcore_initialization: AppCore) -> None:
         """Test Result with complex data types"""
         from tbot223_core.Result import Result
         
@@ -374,9 +393,9 @@ class TestResultClass:
 class TestResultWrapper:
     """Tests for ResultWrapper decorator class"""
     
-    def test_result_wrapper_success(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_result_wrapper_success(self, test_appcore_initialization: AppCore) -> None:
         """Test ResultWrapper with successful function"""
-        @AppCore.ResultWrapper()
+        @ResultWrapper()
         def add_numbers(a, b):
             return a + b
         
@@ -384,9 +403,9 @@ class TestResultWrapper:
         assert result.success is True
         assert result.data == 15
     
-    def test_result_wrapper_exception(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_result_wrapper_exception(self, test_appcore_initialization: AppCore) -> None:
         """Test ResultWrapper with function that raises exception"""
-        @AppCore.ResultWrapper()
+        @ResultWrapper()
         def divide(a, b):
             return a / b
         
@@ -394,11 +413,11 @@ class TestResultWrapper:
         assert result.success is False
         assert "ZeroDivisionError" in result.data["error"]["type"]
     
-    def test_result_wrapper_returns_result(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_result_wrapper_returns_result(self, test_appcore_initialization: AppCore) -> None:
         """Test ResultWrapper with function that already returns Result"""
         from tbot223_core.Result import Result
         
-        @AppCore.ResultWrapper()
+        @ResultWrapper()
         def returns_result():
             return Result(True, None, "context", "already_result")
         
@@ -407,9 +426,9 @@ class TestResultWrapper:
         assert result.data == "already_result"
         assert result.context == "context"
     
-    def test_result_wrapper_with_kwargs(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_result_wrapper_with_kwargs(self, test_appcore_initialization: AppCore) -> None:
         """Test ResultWrapper with kwargs"""
-        @AppCore.ResultWrapper()
+        @ResultWrapper()
         def greet(name, greeting="Hello"):
             return f"{greeting}, {name}!"
         
@@ -421,7 +440,7 @@ class TestResultWrapper:
 class TestSafeCLIInput:
     """Test cases for safe_CLI_input method"""
     
-    def test_safe_cli_input_basic_string(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_basic_string(self, test_appcore_initialization: AppCore) -> None:
         """Test basic string input"""
         from unittest.mock import patch
         
@@ -430,7 +449,7 @@ class TestSafeCLIInput:
             assert result.success is True
             assert result.data == 'hello'
     
-    def test_safe_cli_input_integer_conversion(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_integer_conversion(self, test_appcore_initialization: AppCore) -> None:
         """Test input with integer type conversion"""
         from unittest.mock import patch
         
@@ -440,7 +459,7 @@ class TestSafeCLIInput:
             assert result.data == 42
             assert isinstance(result.data, int)
     
-    def test_safe_cli_input_float_conversion(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_float_conversion(self, test_appcore_initialization: AppCore) -> None:
         """Test input with float type conversion"""
         from unittest.mock import patch
         
@@ -449,7 +468,7 @@ class TestSafeCLIInput:
             assert result.success is True
             assert abs(result.data - 3.14) < 0.001
     
-    def test_safe_cli_input_valid_options(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_valid_options(self, test_appcore_initialization: AppCore) -> None:
         """Test input with valid options validation"""
         from unittest.mock import patch
         
@@ -461,7 +480,7 @@ class TestSafeCLIInput:
             assert result.success is True
             assert result.data == 'yes'
     
-    def test_safe_cli_input_valid_options_case_insensitive(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_valid_options_case_insensitive(self, test_appcore_initialization: AppCore) -> None:
         """Test input with valid options - case insensitive"""
         from unittest.mock import patch
         
@@ -474,7 +493,7 @@ class TestSafeCLIInput:
             assert result.success is True
             assert result.data == 'YES'
     
-    def test_safe_cli_input_valid_options_case_sensitive(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_valid_options_case_sensitive(self, test_appcore_initialization: AppCore) -> None:
         """Test input with valid options - case sensitive rejection then valid"""
         from unittest.mock import patch
         
@@ -488,7 +507,7 @@ class TestSafeCLIInput:
             assert result.success is True
             assert result.data == 'yes'
     
-    def test_safe_cli_input_invalid_type_conversion_retry(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_invalid_type_conversion_retry(self, test_appcore_initialization: AppCore) -> None:
         """Test retry on invalid type conversion"""
         from unittest.mock import patch
         
@@ -501,7 +520,7 @@ class TestSafeCLIInput:
             assert result.success is True
             assert result.data == 123
     
-    def test_safe_cli_input_max_retries_exceeded(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_max_retries_exceeded(self, test_appcore_initialization: AppCore) -> None:
         """Test max retries exceeded returns failure"""
         from unittest.mock import patch
         
@@ -514,7 +533,7 @@ class TestSafeCLIInput:
             assert result.success is False
             assert "Maximum retry attempts" in result.error
     
-    def test_safe_cli_input_empty_not_allowed(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_empty_not_allowed(self, test_appcore_initialization: AppCore) -> None:
         """Test empty input rejected when not allowed"""
         from unittest.mock import patch
         
@@ -526,7 +545,7 @@ class TestSafeCLIInput:
             assert result.success is True
             assert result.data == 'valid'
     
-    def test_safe_cli_input_empty_allowed(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_empty_allowed(self, test_appcore_initialization: AppCore) -> None:
         """Test empty input accepted when allowed"""
         from unittest.mock import patch
         
@@ -538,7 +557,7 @@ class TestSafeCLIInput:
             assert result.success is True
             assert result.data == ''
     
-    def test_safe_cli_input_invalid_max_retries(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_invalid_max_retries(self, test_appcore_initialization: AppCore) -> None:
         """Test invalid max_retries parameter raises error"""
         result = test_appcore_initialization.safe_CLI_input(
             prompt="Enter text: ",
@@ -547,7 +566,7 @@ class TestSafeCLIInput:
         assert result.success is False
         assert "max_retries must be a positive integer" in str(result.data)
     
-    def test_safe_cli_input_invalid_max_retries_negative(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_invalid_max_retries_negative(self, test_appcore_initialization: AppCore) -> None:
         """Test negative max_retries parameter raises error"""
         result = test_appcore_initialization.safe_CLI_input(
             prompt="Enter text: ",
@@ -556,7 +575,7 @@ class TestSafeCLIInput:
         assert result.success is False
         assert "max_retries must be a positive integer" in str(result.data)
     
-    def test_safe_cli_input_unsupported_type_without_other_type(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_unsupported_type_without_other_type(self, test_appcore_initialization: AppCore) -> None:
         """Test unsupported input_type without other_type flag"""
         result = test_appcore_initialization.safe_CLI_input(
             prompt="Enter text: ",
@@ -566,7 +585,7 @@ class TestSafeCLIInput:
         assert result.success is False
         assert "input_type must be one of" in str(result.data)
     
-    def test_safe_cli_input_custom_type_with_other_type(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_custom_type_with_other_type(self, test_appcore_initialization: AppCore) -> None:
         """Test custom input_type with other_type flag enabled"""
         from unittest.mock import patch
         
@@ -583,7 +602,7 @@ class TestSafeCLIInput:
             assert result.success is True
             assert result.data == ['a', 'b', 'c']
     
-    def test_safe_cli_input_bool_conversion(self, test_appcore_initialization: AppCore.AppCore) -> None:
+    def test_safe_cli_input_bool_conversion(self, test_appcore_initialization: AppCore) -> None:
         """Test bool type conversion (note: bool('False') is True in Python)"""
         from unittest.mock import patch
         

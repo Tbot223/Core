@@ -180,3 +180,4 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 .DS_Store
+tbot223_core/.DS_Store

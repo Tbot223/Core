@@ -11,7 +11,8 @@ import logging
 #internal Modules
 from tbot223_core.Result import Result
 from tbot223_core.Exception import ExceptionTracker
-from tbot223_core import FileManager, LogSys
+from tbot223_core.FileManager import FileManager
+from tbot223_core.LogSys import LoggerManager, Log
 
 class AppCore:
     """
@@ -49,8 +50,8 @@ class AppCore:
     
     def __init__(self, is_logging_enabled: bool=True, is_debug_enabled: bool=False, default_lang: str="en",
                  base_dir: Union[str, Path]=None,
-                 logger_manager_instance: Optional[LogSys.LoggerManager]=None, logger: Optional[logging.Logger]=None, 
-                 log_instance: Optional[LogSys.Log]=None, filemanager: Optional[FileManager.FileManager]=None):
+                 logger_manager_instance: Optional[LoggerManager]=None, logger: Optional[logging.Logger]=None, 
+                 log_instance: Optional[Log]=None, filemanager: Optional[FileManager]=None):
 
         # Initialize paths
         self._PARENT_DIR = Path(base_dir) if base_dir is not None else Path.cwd()
@@ -66,11 +67,11 @@ class AppCore:
         self._logger_manager = None
         self.logger = None
         if self.__is_logging_enabled__:
-            self._logger_manager = logger_manager_instance or LogSys.LoggerManager(base_dir=self._PARENT_DIR / "logs", second_log_dir="app_core")
+            self._logger_manager = logger_manager_instance or LoggerManager(base_dir=self._PARENT_DIR / "logs", second_log_dir="app_core")
             self._logger_manager.make_logger("AppCoreLogger")
             self.logger = logger or self._logger_manager.get_logger("AppCoreLogger").data
-        self.log = log_instance or LogSys.Log(logger=self.logger)
-        self._file_manager  = filemanager or FileManager.FileManager(is_logging_enabled=False, base_dir=self._PARENT_DIR)
+        self.log = log_instance or Log(logger=self.logger)
+        self._file_manager  = filemanager or FileManager(is_logging_enabled=False, base_dir=self._PARENT_DIR)
         
         # Initialize internal variables
         self._lang_cache = {}
@@ -130,7 +131,7 @@ class AppCore:
         Args:
             data : List of tuples containing functions and their parameters.
             workers : Number of worker threads/processes.
-            timeout : Maximum time to wait for each function to complete.
+            timeout : Maximum time to wait for each function to complete. (not per task, total timeout is timeout * number of tasks)
             type : 'thread' for ThreadPoolExecutor, 'process' for ProcessPoolExecutor.
 
         Returns:
@@ -149,7 +150,7 @@ class AppCore:
         with executor_type(max_workers=workers) as executor:
             future_to_task = {executor.submit(func, **params): idx for idx, (func, params) in enumerate(data)}
 
-            for future in as_completed(future_to_task):
+            for future in as_completed(future_to_task, timeout=timeout * len(future_to_task)):
                 idx = future_to_task[future]
                 try:
                     result = future.result(timeout=timeout)
@@ -207,7 +208,7 @@ class AppCore:
         def wrapper(self, *args, **kwargs):
             res = func(self, *args, **kwargs)
             if not res.success:
-                if res.data["error"]["type"] == "KeyError":
+                if isinstance(res.data, dict) and res.data.get("error", {}).get("type") == "KeyError":
                     lang = args[1] if len(args) > 1 else kwargs.get("lang", self._default_lang)
                     key = args[0] if len(args) > 0 else kwargs.get("key", "")
                     lang_file = self._file_manager.read_json(self._LANG_DIR / f"{lang}.json")
@@ -229,7 +230,7 @@ class AppCore:
                 
 
     # external Methods
-    def thread_pool_executor(self, data: List[Tuple[Callable[ ... , Any], Dict]], workers: int = None, override: bool = False, timeout: float = None) -> Result:
+    def thread_pool_executor(self, data: List[Tuple[Callable[ ... , Any], Dict]], workers: int = os.cpu_count(), override: bool = False, timeout: float = None) -> Result:
         """
         Execute functions in parallel using ThreadPoolExecutor.
 
@@ -265,7 +266,7 @@ class AppCore:
                 self.log.log_message("ERROR", f"Error in thread pool executor: {str(e)}")
             return self._exception_tracker.get_exception_return(e)
 
-    def process_pool_executor(self, data: List[Tuple[Callable[ ... , Any], Dict]], workers: int = None, override: bool = False, timeout: float = None, chunk_size: Optional[int] = None) -> Result:
+    def process_pool_executor(self, data: List[Tuple[Callable[ ... , Any], Dict]], workers: int = os.cpu_count(), override: bool = False, timeout: float = None, chunk_size: Optional[int] = None) -> Result:
         """
         Execute functions in parallel using ProcessPoolExecutor.
 
