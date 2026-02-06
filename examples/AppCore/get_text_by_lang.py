@@ -43,7 +43,7 @@ if __name__ == "__main__":
             json.dump(files, f, ensure_ascii=False, indent=4)
 
     # Initialize AppCore
-    ap = AppCore.AppCore(is_logging_enabled=True, base_dir=BASE_DIR)
+    ap = AppCore(is_logging_enabled=True, base_dir=BASE_DIR)
 
     # Retrieve and print messages in different languages
     for lang in ap._supported_langs:

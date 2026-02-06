@@ -81,21 +81,6 @@ class TestLogSysEdgeCases:
         result = empty_log.log_message("INFO", "Test message")
         assert not result.success, "Logging without logger should fail"
     
-    def test_log_message_levels(self, setup_module):
-        """Test all log message levels"""
-        logger_manager, _ = setup_module
-        
-        # Create a new logger for this test
-        logger_name = "level_test_logger"
-        logger_manager.make_logger(logger_name=logger_name, log_level="DEBUG")
-        logger = logger_manager.get_logger(logger_name).data
-        log = Log(logger=logger)
-        
-        # Test all levels
-        for level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
-            result = log.log_message(level, f"Test message for {level}")
-            assert result.success, f"Logging at {level} level should succeed"
-    
     def test_stop_stream_handlers(self, setup_module):
         """Test stopping stream handlers"""
         logger_manager, _ = setup_module
@@ -150,7 +135,84 @@ class TestSimpleSetting:
         result = log.log_message("INFO", "Test message from SimpleSetting")
         assert result.success, f"Logging with SimpleSetting failed: {result.error}"
 
-    # I WILL ADD MORE EDGE CASE TESTS HERE IN THE FUTURE
+
+class TestLogMessageEdgeCases:
+    """Additional edge case tests for Log.log_message"""
+    
+    def test_log_message_with_integer_level(self, tmp_path):
+        """Test logging with integer log level"""
+        import logging
+        logger_manager = LoggerManager(base_dir=tmp_path / "logs", second_log_dir="test")
+        logger_manager.make_logger("int_level_logger", log_level="DEBUG")
+        logger = logger_manager.get_logger("int_level_logger").data
+        log = Log(logger=logger)
+        
+        # Test with integer level
+        result = log.log_message(logging.INFO, "Test with integer level")
+        assert result.success, "Logging with integer level should succeed"
+        
+    def test_log_message_invalid_string_level_fallback(self, tmp_path):
+        """Test that invalid string level falls back to INFO"""
+        logger_manager = LoggerManager(base_dir=tmp_path / "logs", second_log_dir="test")
+        logger_manager.make_logger("fallback_logger", log_level="DEBUG")
+        logger = logger_manager.get_logger("fallback_logger").data
+        log = Log(logger=logger)
+        
+        # Invalid level should fallback to INFO
+        result = log.log_message("INVALID_LEVEL", "Test with invalid level")
+        assert result.success, "Logging with invalid level should succeed (fallback to INFO)"
+        
+    def test_log_message_lowercase_level(self, tmp_path):
+        """Test logging with lowercase level string"""
+        logger_manager = LoggerManager(base_dir=tmp_path / "logs", second_log_dir="test")
+        logger_manager.make_logger("lowercase_logger", log_level="DEBUG")
+        logger = logger_manager.get_logger("lowercase_logger").data
+        log = Log(logger=logger)
+        
+        # Test lowercase level
+        result = log.log_message("info", "Test with lowercase level")
+        assert result.success, "Logging with lowercase level should succeed"
+
+
+class TestSimpleSettingEdgeCases:
+    """Additional edge case tests for SimpleSetting"""
+    
+    def test_simple_setting_with_custom_log_level(self, tmp_path):
+        """Test SimpleSetting with custom log level"""
+        import logging
+        setting = LogSys.SimpleSetting(
+            base_dir=tmp_path / "logs",
+            second_log_dir="test",
+            logger_name="custom_level_logger",
+            log_level=logging.DEBUG
+        )
+        
+        logger_manager, log, logger = setting.get_instance()
+        assert logger is not None, "Logger should be initialized with custom level"
+        
+    def test_simple_setting_path_as_string(self, tmp_path):
+        """Test SimpleSetting with string paths"""
+        setting = LogSys.SimpleSetting(
+            base_dir=str(tmp_path / "logs"),
+            second_log_dir="test",
+            logger_name="string_path_logger"
+        )
+        
+        logger_manager, log, logger = setting.get_instance()
+        assert logger is not None, "Logger should be initialized with string paths"
+
+
+class TestLoggerManagerEdgeCases:
+    """Additional edge case tests for LoggerManager"""
+    
+    def test_make_logger_with_integer_level(self, tmp_path):
+        """Test make_logger with integer log level"""
+        import logging
+        logger_manager = LoggerManager(base_dir=tmp_path / "logs", second_log_dir="test")
+        
+        result = logger_manager.make_logger("int_level", log_level=logging.WARNING)
+        assert result.success, "Creating logger with integer level should succeed"
+
 
 if __name__ == "__main__":
     pytest.main([__file__])

@@ -1,16 +1,3 @@
-
-# TODO: Exception Module whole review and refactor needed
-# TODO: All Methods need re-structuring and optimization
-# Why? -> It's So old. So, it's not optimized, and not structured well.
-# TODO: Add tb[0] info to get the origin of exception (currently using tb[-1] only)
-# Why? -> To provide more detailed exception origin information.
-# WARNING: Method names DO NOT change ( Arguments are allowed to change )
-# Why? -> To maintain backward compatibility.
-# TODO: Add unique ID provider for exceptions (for future use)
-# Why? -> To uniquely identify exceptions for tracking and logging.
-# TODO: All Moudules need to be re-checked for use of ExceptionTracker
-# Why? -> To ensure consistent exception handling across the codebase.
-
 # external modules
 import sys
 import os
@@ -31,6 +18,12 @@ class ExceptionTracker():
 
     2. Exception Information Tracking: Provides functionality to track exception information and return related information.
         - get_exception_info: Returns information about the exception.
+
+    3. Exception Return Standardization: Provides a convenience function to standardize the return of exception information.
+        - get_exception_return: Standardizes the return of exception information.
+
+    4. Predefined Error Code Retrieval: Provides functionality to get a predefined error code based on the exception type.
+        - get_error_code: Returns a predefined error code for the exception type.
     """
 
     def __init__(self):
@@ -81,7 +74,6 @@ class ExceptionTracker():
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_location, L1", tb_str)
 
-    # L2 Methods
     def get_exception_info(self, error: Exception, user_input: Any=None, params: Tuple[Tuple, dict]=None, mask_tuple: Tuple[bool, ...] = ()) -> Result:
         """
         Function to track exception information and return related information
@@ -128,6 +120,7 @@ class ExceptionTracker():
 
             tb = traceback.extract_tb(error.__traceback__)
             frame = tb[-1]  # Most recent frame
+            frame2 = tb[0]  # Original frame 
 
             masking = lambda index, return_value: "<Masked>" if mask_tuple[index] else return_value
 
@@ -142,6 +135,11 @@ class ExceptionTracker():
                     "line": frame.lineno if frame else -1,
                     "function": frame.name if frame else "Unknown"
                 },
+                "origin_location": {
+                    "file": frame2.filename if frame2 else "Unknown",
+                    "line": frame2.lineno if frame2 else -1,
+                    "function": frame2.name if frame2 else "Unknown"
+                },                
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
                 "input_context": {
                     "user_input": masking(0, user_input),
@@ -199,8 +197,47 @@ class ExceptionTracker():
             tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_exception_return, L2", tb_str)
     
-    def get_unique_id(self):
-        pass # TODO: Method to provide unique IDs for exceptions (for future use)
+    def get_error_code(self, error_id_map: dict, error: Exception) -> None:
+        """
+        Function to get a predefined error code based on the exception type.
+
+        Args:
+            - error_id_map (dict): A dictionary mapping exception type names (str) to error
+                codes (any).
+            - error (Exception): The exception object to get the error code for.
+
+        Note:
+            `error_id_map` is yourself defined mapping table. 
+            e.g., { "ZeroDivisionError": 1001, "ValueError": 1002, ... }
+            Why -> To allow users to define their own error codes for different exception types.
+            Error codes wull very from project to project.
+            Error codes can be of any type (int, str, etc.) as per user requirement.
+            
+        Returns:
+            Result: A Result object containing the error code if found.
+                - If the exception type is not found in the error_id_map, returns a Result with success=False and an appropriate error message.
+
+        Example:
+            >>> error_id_map = {
+            >>>     "ZeroDivisionError": 1001,
+            >>>     "ValueError": 1002
+            >>> }
+            >>> try:
+            >>>     1 / 0
+            >>> except Exception as e:
+            >>>     code_result = tracker.get_error_code(error_id_map, e)
+            >>>     print(code_result.data)
+            >>> # Output: 1001
+        """
+        try:
+            if type(error).__name__ not in error_id_map:
+                raise KeyError(f"Error type '{type(error).__name__}' not found in error_id_map.")
+            else:
+                return Result(True, None, None, error_id_map[type(error).__name__])
+        except Exception as e:
+            print("An error occurred while handling another exception. This may indicate a critical issue.")
+            tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            return Result(False, f"{type(e).__name__} :{str(e)}", "Core.ExceptionTracker.get_error_code, L2", tb_str)
         
 class ExceptionTrackerDecorator():
     """
@@ -211,8 +248,11 @@ class ExceptionTrackerDecorator():
     - Not suitable if logging or side effects are required. 
     
     Args:
-        - masking (bool, optional): If True, exception information will be masked. Defaults to False.
-        - tracker (ExceptionTracker, optional): An instance of ExceptionTracker to use. If None, a new instance will be created. Defaults to None.
+        - mask_tuple: A tuple indicating which exception details to mask. Defaults to (False, False, False, False).
+            - If True, the corresponding detail will be masked. (user_input, params, traceback, computer_info)
+            - If False, the detail will be shown.
+            - If make mistake in format, defaults to (False, False, False, False).
+        - tracker: An instance of ExceptionTracker to use. If None, a new instance will be created. Defaults to None.
 
     Returns:
         If no exception occurs, returns the original function's return value.
@@ -220,7 +260,7 @@ class ExceptionTrackerDecorator():
     
     Example:
         >>> tracker = ExceptionTracker()
-        >>> @ExceptionTrackerDecorator(masking=True, tracker=tracker)
+        >>> @ExceptionTrackerDecorator(mask_tuple=(True, True, True, True), tracker=tracker)
         >>> def risky_function(x, y):
         >>>     return x / y
         >>> print(risky_function(10, y=0))
@@ -228,16 +268,19 @@ class ExceptionTrackerDecorator():
         >>> print(risky_function(10, y=0).data['params'])
         >>> # Output: ((10,), {'y': 0})
     """
-    def __init__(self, masking: bool=False, tracker: ExceptionTracker=None):
+    def __init__(self, mask_tuple: Tuple[bool, bool, bool, bool] = (False, False, False, False), tracker: ExceptionTracker=None):
         self.tracker = tracker or ExceptionTracker()
-        self.masking = masking
+        self.mask_tuple = mask_tuple
+        if not isinstance(self.mask_tuple, tuple) or not all(isinstance(i, bool) for i in self.mask_tuple):
+            self.mask_tuple = (False, False, False, False)
+        if len(self.mask_tuple) != 4:
+            self.mask_tuple = (False, False, False, False)
 
     def __call__(self, func):
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                # When masking=True, mask all fields; otherwise mask nothing
-                mask_tuple = (True, True, True, True) if self.masking else (False, False, False, False)
-                return self.tracker.get_exception_return(error=e, params=(args, kwargs), mask_tuple=mask_tuple)
+                # Use the tracker to get standardized exception return
+                return self.tracker.get_exception_return(error=e, params=(args, kwargs), mask_tuple=self.mask_tuple)
         return wrapper

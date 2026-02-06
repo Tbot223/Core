@@ -755,5 +755,199 @@ class TestUtilsMethods:
         assert not result.success, "Negative interval should fail"
 
 
+@pytest.mark.usefixtures("setup_module")
+class TestHashingFailures:
+    """Tests for hashing method failure cases"""
+    
+    def test_hashing_invalid_algorithm(self, setup_module):
+        """Test hashing with invalid algorithm"""
+        utils, _, _ = setup_module
+        
+        result = utils.hashing("test_data", algorithm="invalid_algo")
+        assert not result.success, "Invalid algorithm should fail"
+        assert "Unsupported algorithm" in str(result.data) or "unsupported" in result.error.lower()
+    
+    def test_hashing_non_string_data(self, setup_module):
+        """Test hashing with non-string data"""
+        utils, _, _ = setup_module
+        
+        result = utils.hashing(12345, algorithm="sha256")
+        assert not result.success, "Non-string data should fail"
+        assert "must be a string" in str(result.data) or "string" in result.error.lower()
+    
+    def test_hashing_none_data(self, setup_module):
+        """Test hashing with None data"""
+        utils, _, _ = setup_module
+        
+        result = utils.hashing(None, algorithm="sha256")
+        assert not result.success, "None data should fail"
+    
+    def test_hashing_empty_string(self, setup_module):
+        """Test hashing with empty string"""
+        utils, _, _ = setup_module
+        
+        result = utils.hashing("", algorithm="sha256")
+        assert result.success, "Empty string should be hashable"
+        assert len(result.data) > 0, "Hash should not be empty"
+
+
+@pytest.mark.usefixtures("setup_module")
+class TestPBKDF2Failures:
+    """Tests for PBKDF2 HMAC failure cases"""
+    
+    def test_pbkdf2_invalid_algorithm(self, setup_module):
+        """Test pbkdf2_hmac with invalid algorithm"""
+        utils, _, _ = setup_module
+        
+        result = utils.pbkdf2_hmac(
+            password="test_password",
+            algorithm="md5",  # md5 is not supported for pbkdf2
+            iterations=100000,
+            salt_size=16
+        )
+        assert not result.success, "Invalid algorithm should fail"
+    
+    def test_pbkdf2_non_string_password(self, setup_module):
+        """Test pbkdf2_hmac with non-string password"""
+        utils, _, _ = setup_module
+        
+        result = utils.pbkdf2_hmac(
+            password=12345,  # Not a string
+            algorithm="sha256",
+            iterations=100000,
+            salt_size=16
+        )
+        assert not result.success, "Non-string password should fail"
+    
+    def test_pbkdf2_zero_iterations(self, setup_module):
+        """Test pbkdf2_hmac with zero iterations"""
+        utils, _, _ = setup_module
+        
+        result = utils.pbkdf2_hmac(
+            password="test_password",
+            algorithm="sha256",
+            iterations=0,
+            salt_size=16
+        )
+        assert not result.success, "Zero iterations should fail"
+    
+    def test_pbkdf2_negative_iterations(self, setup_module):
+        """Test pbkdf2_hmac with negative iterations"""
+        utils, _, _ = setup_module
+        
+        result = utils.pbkdf2_hmac(
+            password="test_password",
+            algorithm="sha256",
+            iterations=-100,
+            salt_size=16
+        )
+        assert not result.success, "Negative iterations should fail"
+    
+    def test_pbkdf2_zero_salt_size(self, setup_module):
+        """Test pbkdf2_hmac with zero salt size"""
+        utils, _, _ = setup_module
+        
+        result = utils.pbkdf2_hmac(
+            password="test_password",
+            algorithm="sha256",
+            iterations=100000,
+            salt_size=0
+        )
+        assert not result.success, "Zero salt size should fail"
+    
+    def test_verify_pbkdf2_wrong_password(self, setup_module):
+        """Test verify_pbkdf2_hmac with wrong password"""
+        utils, _, _ = setup_module
+        
+        # Generate hash
+        gen_result = utils.pbkdf2_hmac(
+            password="correct_password",
+            algorithm="sha256",
+            iterations=100000,
+            salt_size=16
+        )
+        assert gen_result.success, "Hash generation should succeed"
+        
+        # Verify with wrong password
+        verify_result = utils.verify_pbkdf2_hmac(
+            password="wrong_password",
+            salt_hex=gen_result.data["salt_hex"],
+            hash_hex=gen_result.data["hash_hex"],
+            iterations=gen_result.data["iterations"],
+            algorithm=gen_result.data["algorithm"]
+        )
+        assert verify_result.success, "Verification should succeed (just return False)"
+        assert verify_result.data is False, "Wrong password should return False"
+    
+    def test_verify_pbkdf2_invalid_salt_hex(self, setup_module):
+        """Test verify_pbkdf2_hmac with invalid salt hex"""
+        utils, _, _ = setup_module
+        
+        result = utils.verify_pbkdf2_hmac(
+            password="test_password",
+            salt_hex="not_valid_hex",
+            hash_hex="abc123",
+            iterations=100000,
+            algorithm="sha256"
+        )
+        assert not result.success, "Invalid salt hex should fail"
+
+
+@pytest.mark.usefixtures("setup_module")
+class TestStrToPath:
+    """Tests for str_to_path method"""
+    
+    def test_str_to_path_already_path(self, setup_module):
+        """Test str_to_path with Path object input"""
+        utils, _, _ = setup_module
+        
+        path_obj = Path("/some/path")
+        result = utils.str_to_path(path_obj)
+        assert result.success, "Path object input should succeed"
+        # When input is not a string, it returns the input as-is
+        assert result.data == path_obj
+    
+    def test_str_to_path_integer_input(self, setup_module):
+        """Test str_to_path with integer input"""
+        utils, _, _ = setup_module
+        
+        result = utils.str_to_path(12345)
+        assert result.success, "Non-string input returns input as-is"
+        assert result.data == 12345
+    
+    def test_str_to_path_empty_string(self, setup_module):
+        """Test str_to_path with empty string"""
+        utils, _, _ = setup_module
+        
+        result = utils.str_to_path("")
+        assert result.success, "Empty string should be convertible"
+        assert isinstance(result.data, Path)
+    
+    def test_str_to_path_special_characters(self, setup_module):
+        """Test str_to_path with special characters"""
+        utils, _, _ = setup_module
+        
+        special_path = "path/with spaces/and-dashes/and_underscores"
+        result = utils.str_to_path(special_path)
+        assert result.success, "Path with special characters should succeed"
+        assert isinstance(result.data, Path)
+
+
+@pytest.mark.usefixtures("setup_module")
+class TestDecoratorUtilsMethods:
+    """Additional tests for DecoratorUtils"""
+    
+    def test_count_runtime_with_exception(self, setup_module):
+        """Test count_runtime with function that raises exception"""
+        _, decorator_utils, _ = setup_module
+        
+        @decorator_utils.count_runtime()
+        def failing_func():
+            raise ValueError("Test error")
+        
+        with pytest.raises(ValueError):
+            failing_func()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-m not performance"])
